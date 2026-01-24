@@ -26,94 +26,106 @@ from compute_delay import (
     haversine_distance
 )
 
+import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import numpy as np
 
 
-def visualize_hybrid_process_for_server(server_id,
-                                        service_ids,
-                                        cost_scores,
-                                        req_scores,
-                                        total_scores,
-                                        top_n_set,
-                                        random_set,
-                                        final_selected_set):
+def visualize_detailed_hybrid_process(server_id,
+                                      candidate_data):
     """
-    可视化 hybrid-A-1 策略在单台服务器上的选择过程
+    绘制 Hybrid-A-1 的详细全流程图
+    candidate_data: list of dict, 每个元素包含:
+      {
+        'id': 服务ID,
+        'cost_part': cost部分的得分,
+        'req_part': req部分的得分,
+        'total': 总分,
+        'status': 最终状态 ('Top-N', 'Random', 'Discarded')
+      }
     """
-    # 准备数据：按总分从高到低排序
-    data = []
-    for s_id in service_ids:
-        data.append({
-            "id": s_id,
-            "cost_score": cost_scores.get(s_id, 0),
-            "req_score": req_scores.get(s_id, 0),
-            "total_score": total_scores.get(s_id, 0),
-            "status": "Top-N (Deterministic)" if s_id in top_n_set else
-            ("Random Picked" if s_id in random_set else "Discarded")
-        })
+    # 1. 数据准备：按总分从高到低排序
+    data = sorted(candidate_data, key=lambda x: x['total'], reverse=True)
 
-    # 按总分降序排序
-    data.sort(key=lambda x: x["total_score"], reverse=True)
+    ids = [str(d['id']) for d in data]
+    cost_parts = [d['cost_part'] for d in data]
+    req_parts = [d['req_part'] for d in data]
+    totals = [d['total'] for d in data]
+    statuses = [d['status'] for d in data]
 
-    # 提取绘图数据
-    sorted_ids = [d["id"] for d in data]
-    sorted_total = [d["total_score"] for d in data]
-    sorted_cost = [d["cost_score"] for d in data]
-    sorted_req = [d["req_score"] for d in data]
-    status_list = [d["status"] for d in data]
+    # 2. 创建画布：上下两个子图
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=False)
 
-    # 定义颜色映射
-    color_map = {
-        "Top-N (Deterministic)": "#FF4B4B",  # 红色：确定性选择
-        "Random Picked": "#1F77FF",  # 蓝色：随机选择
-        "Discarded": "#D3D3D3"  # 灰色：未选中
+    # ==========================================
+    # 子图 1: 评分来源分解 (Score Breakdown)
+    # ==========================================
+    x_pos = np.arange(len(data))
+
+    # 绘制堆叠柱状图
+    p1 = ax1.bar(x_pos, cost_parts, color='#9b59b6', label='Cost Score (α·W_cost)', alpha=0.9, width=0.6)
+    p2 = ax1.bar(x_pos, req_parts, bottom=cost_parts, color='#e67e22', label='Request Score (β·W_req)', alpha=0.9,
+                 width=0.6)
+
+    # 标注总分
+    for i, total in enumerate(totals):
+        ax1.text(i, total + 0.05, f"{total:.2f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels([f"S-{i}" for i in ids], fontsize=11)
+    ax1.set_ylabel("Weighted Score", fontsize=12)
+    ax1.set_title(f"[Stage 1] Score Calculation & Merging (Server {server_id})\nWhere did the score come from?",
+                  fontsize=14, fontweight='bold')
+    ax1.legend(loc='upper right')
+    ax1.grid(axis='y', linestyle='--', alpha=0.3)
+
+    # 添加解释性文本
+    ax1.text(0.02, 0.95,
+             "Purple only = From Cost Map\nOrange only = From Request Map\nBoth = High Quality Intersection",
+             transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
+
+    # ==========================================
+    # 子图 2: 选择逻辑 (Selection Logic)
+    # ==========================================
+    # 为了让上面的柱子和下面的条形对应，我们需要反转Y轴顺序，因为水平条形图默认是从下往上画
+    # 但为了直观，我们保持与上面X轴顺序一致，这里做一点坐标变换技巧
+
+    # 定义颜色
+    status_colors = {
+        'Top-N': '#e74c3c',  # 红色
+        'Random': '#3498db',  # 蓝色
+        'Discarded': '#bdc3c7'  # 灰色
     }
-    bar_colors = [color_map[s] for s in status_list]
+    bar_colors = [status_colors[s] for s in statuses]
 
-    # === 开始绘图 ===
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    # 绘制水平柱状图
+    # 绘制水平条形图 (使用负索引来保持从上到下的视觉顺序)
     y_pos = np.arange(len(data))
-    bars = ax.barh(y_pos, sorted_total, color=bar_colors, edgecolor='black', alpha=0.8)
+    ax2.barh(y_pos[::-1], totals, color=bar_colors, edgecolor='black', alpha=0.8, height=0.6)
 
-    # 设置Y轴标签（服务ID）
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels([f"Service {i}" for i in sorted_ids], fontsize=12)
-    ax.invert_yaxis()  # 让分数最高的在最上面
+    # 标签
+    ax2.set_yticks(y_pos[::-1])
+    ax2.set_yticklabels([f"Service {i}" for i in ids], fontsize=11)
+    ax2.set_xlabel("Total Hybrid Score", fontsize=12)
+    ax2.set_title(f"[Stage 2] Final Selection: Top-N + Random Filling", fontsize=14, fontweight='bold')
 
-    # 设置X轴
-    ax.set_xlabel("Hybrid Score (Weighted)", fontsize=14, fontname='Arial')
-    ax.set_title(f"Hybrid-A-1 Selection Process (Server {server_id})\nTop-N + Random Filling", fontsize=16,
-                 fontname='Arial')
+    # 在条形旁添加状态文本
+    for i, (total, status) in enumerate(zip(totals, statuses)):
+        # 这里的 i 对应 y_pos 的第 i 个（需要反转）
+        y = y_pos[::-1][i]
+        ax2.text(total + 0.1, y, f"{status}", va='center', fontsize=10, color='black')
 
-    # 添加具体分数的堆叠展示（可选，这里用文字标注代替）
-    for i, bar in enumerate(bars):
-        # 在柱子末尾标注状态
-        status = status_list[i]
-        score = sorted_total[i]
-
-        # 标注文本
-        ax.text(score + 0.05, bar.get_y() + bar.get_height() / 2,
-                f"{score:.2f} [{status}]",
-                va='center', fontsize=10, color='black')
-
-    # 手动添加图例
+    # 手动图例
     legend_patches = [
-        mpatches.Patch(color='#FF4B4B', label='Step 1: Top-N Deterministic'),
-        mpatches.Patch(color='#1F77FF', label='Step 2: Randomly Filled'),
-        mpatches.Patch(color='#D3D3D3', label='Discarded Candidates')
+        mpatches.Patch(color='#e74c3c', label='Top-N Deterministic'),
+        mpatches.Patch(color='#3498db', label='Randomly Filled'),
+        mpatches.Patch(color='#bdc3c7', label='Discarded')
     ]
-    ax.legend(handles=legend_patches, loc='lower right', fontsize=12)
+    ax2.legend(handles=legend_patches, loc='lower right')
+    ax2.grid(axis='x', linestyle='--', alpha=0.3)
 
-    plt.grid(axis='x', linestyle='--', alpha=0.5)
     plt.tight_layout()
-
-    # 保存图片
-    plt.savefig(f"hybrid_process_server_{server_id}.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig(f"hybrid_process_detailed_server_{server_id}.pdf", format='pdf', bbox_inches='tight')
     plt.show()
-    print(f"✅ 已生成 Server {server_id} 的混合策略可视化图表")
-
+    print(f"✅ 已生成详细流程图：hybrid_process_detailed_server_{server_id}.pdf")
 
 ###############################################################
 #  (1) Problem定义: MyServiceDeployProblem
@@ -664,99 +676,145 @@ class ServiceSampling(Sampling):
             return expand_population_new(base_mat)
             # return expand_population(base_mat)
 
+
         elif self.mode == "hybrid-A-1":
+
+            # ... (这部分代码保持不变，获取 cost_mat 和 req_mat) ...
+
             cost_mat, _, _, _ = greedy_service_deployment_by_cost(
+
                 problem.servers_pos, problem.user_positions,
+
                 problem.user_services, problem.assigned_server
+
             )
+
             req_mat, _, _, _ = greedy_service_deployment_by_request(
+
                 problem.servers_pos, problem.user_positions,
+
                 problem.user_services, problem.assigned_server
+
             )
-            #1.随机在Merge之后的数组里drop掉超容量的
-            #2.按照权重做法去drop掉超出容量限制的数量
-            alpha = 0.5  # 成本占比
-            beta = 0.5  # 请求频率占比
+
+            alpha = 0.5;
+            beta = 0.5
 
             base_mat = np.zeros((k, num_svc), dtype=int)
+
             for j in range(k):
 
-                # 获取 cost_order
-                cost_order = sorted(
-                    [idx for idx, val in enumerate(cost_mat[j]) if val == 1],
-                    key=lambda x: SERVICE_DEPLOY_COSTS[x]
-                )
-                cost_weight = {}
-                for rank, svc in enumerate(cost_order):
-                    cost_weight[svc] = max(SERVICE_CAPACITY_PER_SERVER - rank, 1)
+                # --- 1. 计算权重 (保持不变) ---
 
-                # 获取 request_order
+                cost_order = sorted([idx for idx, val in enumerate(cost_mat[j]) if val == 1],
+
+                                    key=lambda x: SERVICE_DEPLOY_COSTS[x])
+
+                cost_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in enumerate(cost_order)}
+
                 freq = {svc: 0 for svc in range(num_svc)}
+
                 user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
-                for u in user_indices:
-                    freq[problem.user_services[u]] += 1
-                request_order = sorted(
-                    [idx for idx, val in enumerate(req_mat[j]) if val == 1],
-                    key=lambda x: -freq[x]
-                )
-                request_weight = {}
-                for rank, svc in enumerate(request_order):
-                    request_weight[svc] = max(SERVICE_CAPACITY_PER_SERVER - rank, 1)
 
-                # 合并并打分
+                for u in user_indices: freq[problem.user_services[u]] += 1
+
+                request_order = sorted([idx for idx, val in enumerate(req_mat[j]) if val == 1],
+
+                                       key=lambda x: -freq[x])
+
+                request_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in
+                                  enumerate(request_order)}
+
+                # --- 2. 详细数据收集 (修改部分) ---
+
                 merged_set = set(cost_order) | set(request_order)
-                score_dict = {}
 
-                # --- [新增] 为了可视化，记录每个部分的得分 ---
-                viz_cost_scores = {}
-                viz_req_scores = {}
+                # 临时列表，用于后续排序和绘图
+
+                candidates_list = []
 
                 for svc in merged_set:
                     cw = cost_weight.get(svc, 0)
-                    rw = request_weight.get(svc, 0)
-                    score = alpha * cw + beta * rw
-                    score_dict[svc] = score
-                    # 记录分项分（方便画图）
-                    viz_cost_scores[svc] = alpha * cw
-                    viz_req_scores[svc] = beta * rw
 
-                cap = SERVICE_CAPACITY_PER_SERVER  # 假设 cap = 4
+                    rw = request_weight.get(svc, 0)
+
+                    cost_part = alpha * cw
+
+                    req_part = beta * rw
+
+                    total_score = cost_part + req_part
+
+                    candidates_list.append({
+
+                        'id': svc,
+
+                        'cost_part': cost_part,
+
+                        'req_part': req_part,
+
+                        'total': total_score,
+
+                        'status': 'Discarded'  # 默认状态
+
+                    })
+
+                # --- 3. 选择逻辑 ---
+
+                cap = SERVICE_CAPACITY_PER_SERVER
+
                 keep_top_n = 2
+
                 random_pick_n = cap - keep_top_n
 
-                # 排序并获取前 keep_top_n 个高分服务
-                sorted_services = sorted(score_dict.items(), key=lambda x: -x[1])
-                top_services = [svc for svc, _ in sorted_services[:keep_top_n]]
+                # 按总分排序
 
-                # 从剩下的服务中随机选择 random_pick_n 个
-                remaining_candidates = [svc for svc, _ in sorted_services[keep_top_n:]]
-                if len(remaining_candidates) >= random_pick_n:
-                    random_selected = random.sample(remaining_candidates, random_pick_n)
+                candidates_list.sort(key=lambda x: x['total'], reverse=True)
+
+                # 选 Top-N
+
+                top_n_candidates = candidates_list[:keep_top_n]
+
+                for c in top_n_candidates:
+                    c['status'] = 'Top-N'
+
+                # 选 Random
+
+                remaining = candidates_list[keep_top_n:]
+
+                if len(remaining) >= random_pick_n:
+
+                    random_candidates = random.sample(remaining, random_pick_n)
+
                 else:
-                    # 如果剩余不足，就尽可能多选
-                    random_selected = remaining_candidates
 
-                selected_services = top_services + random_selected
+                    random_candidates = remaining
 
-                # 写入部署矩阵
-                for svc in selected_services:
+                for c in random_candidates:
+                    c['status'] = 'Random'
+
+                # 最终选中列表
+
+                selected_ids = [c['id'] for c in top_n_candidates + random_candidates]
+
+                # 写入 base_mat
+
+                for svc in selected_ids:
                     base_mat[j, svc] = 1
+
                 # ==========================================
-                # 🔥 [核心修改] 可视化钩子：只画第0号服务器
+
+                # 🔥 [新钩子] 详细可视化：Server 0
+
                 # ==========================================
-                if j == 0:
-                    print("\n📊 正在生成 Hybrid-A-1 过程可视化 (Server 0)...")
-                    visualize_hybrid_process_for_server(
-                        server_id=j,
-                        service_ids=list(merged_set),
-                        cost_scores=viz_cost_scores,
-                        req_scores=viz_req_scores,
-                        total_scores=score_dict,
-                        top_n_set=set(top_services),
-                        random_set=set(random_selected),
-                        final_selected_set=set(selected_services)
-                    )
+
+                if j == 2:
+                    print(f"\n📊 正在生成 Server {j} 的详细流程图...")
+
+                    visualize_detailed_hybrid_process(j, candidates_list)
+
                 # ==========================================
+
+            return expand_population_new(base_mat)
 
 
 
