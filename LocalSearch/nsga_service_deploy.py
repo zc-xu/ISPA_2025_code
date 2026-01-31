@@ -30,19 +30,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 
+# --- 全局字体设置 (确保与 main.py 风格一致) ---
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['axes.unicode_minus'] = False
 
-def visualize_detailed_hybrid_process(server_id,
-                                      candidate_data):
+
+def visualize_detailed_hybrid_process(server_id, candidate_data):
     """
-    绘制 Hybrid-A-1 的详细全流程图
-    candidate_data: list of dict, 每个元素包含:
-      {
-        'id': 服务ID,
-        'cost_part': cost部分的得分,
-        'req_part': req部分的得分,
-        'total': 总分,
-        'status': 最终状态 ('Top-N', 'Random', 'Discarded')
-      }
+    绘制 Hybrid-A-1 的详细全流程图 (两张独立竖向柱状图，无标注，统一样式)
     """
     # 1. 数据准备：按总分从高到低排序
     data = sorted(candidate_data, key=lambda x: x['total'], reverse=True)
@@ -53,80 +48,96 @@ def visualize_detailed_hybrid_process(server_id,
     totals = [d['total'] for d in data]
     statuses = [d['status'] for d in data]
 
-    # 2. 创建画布：上下两个子图
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=False)
+    # ==========================
+    # 🎨 颜色设置区域 (已调亮)
+    # ==========================
+    # Stage 1: 柔和的浅紫 & 浅橙
+    color_cost = '#BB8FCE'  # 浅紫色 (Lighter Purple)
+    color_req = '#F8C471'  # 浅橙色 (Lighter Orange)
 
-    # ==========================================
-    # 子图 1: 评分来源分解 (Score Breakdown)
-    # ==========================================
-    x_pos = np.arange(len(data))
-
-    # 绘制堆叠柱状图
-    p1 = ax1.bar(x_pos, cost_parts, color='#9b59b6', label='Cost Score (α·W_cost)', alpha=0.9, width=0.6)
-    p2 = ax1.bar(x_pos, req_parts, bottom=cost_parts, color='#e67e22', label='Request Score (β·W_req)', alpha=0.9,
-                 width=0.6)
-
-    # 标注总分
-    for i, total in enumerate(totals):
-        ax1.text(i, total + 0.05, f"{total:.2f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
-
-    ax1.set_xticks(x_pos)
-    ax1.set_xticklabels([f"S-{i}" for i in ids], fontsize=11)
-    ax1.set_ylabel("Weighted Score", fontsize=12)
-    ax1.set_title(f"[Stage 1] Score Calculation & Merging (Server {server_id})\nWhere did the score come from?",
-                  fontsize=14, fontweight='bold')
-    ax1.legend(loc='upper right')
-    ax1.grid(axis='y', linestyle='--', alpha=0.3)
-
-    # 添加解释性文本
-    ax1.text(0.02, 0.95,
-             "Purple only = From Cost Map\nOrange only = From Request Map\nBoth = High Quality Intersection",
-             transform=ax1.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
-
-    # ==========================================
-    # 子图 2: 选择逻辑 (Selection Logic)
-    # ==========================================
-    # 为了让上面的柱子和下面的条形对应，我们需要反转Y轴顺序，因为水平条形图默认是从下往上画
-    # 但为了直观，我们保持与上面X轴顺序一致，这里做一点坐标变换技巧
-
-    # 定义颜色
+    # Stage 2: 清新的红、蓝、灰
     status_colors = {
-        'Top-N': '#e74c3c',  # 红色
-        'Random': '#3498db',  # 蓝色
-        'Discarded': '#bdc3c7'  # 灰色
+        'Top-N': '#FF7675',  # 浅红色 (Soft Red)
+        'Random': '#74B9FF',  # 浅蓝色 (Soft Blue)
+        'Discarded': '#E5E7E9'  # 极浅灰 (Very Light Gray) - 这样如果不选中几乎看不见，很干净
     }
     bar_colors = [status_colors[s] for s in statuses]
 
-    # 绘制水平条形图 (使用负索引来保持从上到下的视觉顺序)
-    y_pos = np.arange(len(data))
-    ax2.barh(y_pos[::-1], totals, color=bar_colors, edgecolor='black', alpha=0.8, height=0.6)
+    x_pos = np.arange(len(data))
 
-    # 标签
-    ax2.set_yticks(y_pos[::-1])
-    ax2.set_yticklabels([f"Service {i}" for i in ids], fontsize=11)
-    ax2.set_xlabel("Total Hybrid Score", fontsize=12)
-    ax2.set_title(f"[Stage 2] Final Selection: Top-N + Random Filling", fontsize=14, fontweight='bold')
+    # =========================================================
+    # 图表 1: [Stage 1] 评分来源分解 (Score Breakdown)
+    # =========================================================
+    plt.figure(figsize=(8, 6))
+    ax1 = plt.gca()
 
-    # 在条形旁添加状态文本
-    for i, (total, status) in enumerate(zip(totals, statuses)):
-        # 这里的 i 对应 y_pos 的第 i 个（需要反转）
-        y = y_pos[::-1][i]
-        ax2.text(total + 0.1, y, f"{status}", va='center', fontsize=10, color='black')
+    # 绘制堆叠柱状图 (竖向)
+    # zorder=3 保证柱子在网格线上方
+    p1 = ax1.bar(x_pos, cost_parts, color=color_cost, label=r'Cost Score ($\alpha \cdot W_{cost}$)',
+                 alpha=0.85, width=0.6, zorder=3, edgecolor='black', linewidth=0.5)
+    p2 = ax1.bar(x_pos, req_parts, bottom=cost_parts, color=color_req, label=r'Request Score ($\beta \cdot W_{req}$)',
+                 alpha=0.85, width=0.6, zorder=3, edgecolor='black', linewidth=0.5)
 
-    # 手动图例
-    legend_patches = [
-        mpatches.Patch(color='#e74c3c', label='Top-N Deterministic'),
-        mpatches.Patch(color='#3498db', label='Randomly Filled'),
-        mpatches.Patch(color='#bdc3c7', label='Discarded')
-    ]
-    ax2.legend(handles=legend_patches, loc='lower right')
-    ax2.grid(axis='x', linestyle='--', alpha=0.3)
+    # --- 样式设置 ---
+    # X轴
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels([f"Service {i}" for i in ids], fontsize=16, rotation=0)
 
+    # Y轴
+    plt.yticks(fontsize=16)
+    plt.ylabel("Weighted Score", fontname='Arial', fontsize=18)
+
+    # 网格线 (放在最底层)
+    ax1.grid(axis='y', linestyle='--', linewidth=0.75, alpha=0.7, zorder=0)
+
+    # 图例 (右上角)
+    ax1.legend(loc='upper right', fontsize=14, frameon=True, edgecolor='lightgray', framealpha=1)
+
+    # 保存 Stage 1
     plt.tight_layout()
-    plt.savefig(f"hybrid_process_detailed_server_{server_id}.pdf", format='pdf', bbox_inches='tight')
-    plt.show()
-    print(f"✅ 已生成详细流程图：hybrid_process_detailed_server_{server_id}.pdf")
+    filename1 = f"hybrid_process_stage1_server_{server_id}.pdf"
+    plt.savefig(filename1, format='pdf', bbox_inches='tight')
+    plt.close()
+    print(f"✅ 生成 Stage 1 图表 (无标注): {filename1}")
 
+    # =========================================================
+    # 图表 2: [Stage 2] 选择逻辑 (Selection Logic) - 改为竖向
+    # =========================================================
+    plt.figure(figsize=(8, 6))
+    ax2 = plt.gca()
+
+    # 绘制普通柱状图 (竖向)
+    # 颜色由 bar_colors 控制 (红/蓝/灰)
+    bars = ax2.bar(x_pos, totals, color=bar_colors, edgecolor='black',
+                   alpha=0.9, width=0.6, zorder=3, linewidth=0.5)
+
+    # --- 样式设置 ---
+    # X轴 (与 Stage 1 完全对齐)
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels([f"Service {i}" for i in ids], fontsize=16, rotation=0)
+
+    # Y轴
+    plt.yticks(fontsize=16)
+    plt.ylabel("Total Hybrid Score", fontname='Arial', fontsize=18)
+
+    # 网格线
+    ax2.grid(axis='y', linestyle='--', linewidth=0.75, alpha=0.7, zorder=0)
+
+    # 手动构建图例 (右上角)
+    legend_patches = [
+        mpatches.Patch(color='#FF7675', label='Top-N Deterministic'),  # 对应上面的 Top-N 颜色
+        mpatches.Patch(color='#74B9FF', label='Randomly Filled'),  # 对应上面的 Random 颜色
+        mpatches.Patch(color='#E5E7E9', label='Discarded')  # 对应上面的 Discarded 颜色
+    ]
+    # 因为是降序排列，右上角通常是空白的，放图例非常合适
+    ax2.legend(handles=legend_patches, loc='upper right', fontsize=14, frameon=True, edgecolor='lightgray', framealpha=1)
+
+    # 保存 Stage 2
+    plt.tight_layout()
+    filename2 = f"hybrid_process_stage2_server_{server_id}.pdf"
+    plt.savefig(filename2, format='pdf', bbox_inches='tight')
+    plt.close()
+    print(f"✅ 生成 Stage 2 图表 (竖版无标注): {filename2}")
 ###############################################################
 #  (1) Problem定义: MyServiceDeployProblem
 ###############################################################
