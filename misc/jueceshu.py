@@ -171,6 +171,6 @@ ax.set_xlim(-2, canvas_width + 2)
 ax.set_ylim(-2, 32)
 
 plt.tight_layout()
-plt.savefig('custom_tree_depth6.png', dpi=300, bbox_inches='tight')
-print("\n图片已保存为 custom_tree_depth6.png")
+plt.savefig('output/custom_tree_depth6.png', dpi=300, bbox_inches='tight')
+print("\n图片已保存为 output/custom_tree_depth6.png")
 plt.show()

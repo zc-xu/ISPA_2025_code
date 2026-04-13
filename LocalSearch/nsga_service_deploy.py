@@ -1,8 +1,12 @@
+import os
 import numpy as np
 np.set_printoptions(threshold=np.inf, linewidth=200)
 import random
 import matplotlib.pyplot as plt
 from pymoo.indicators.hv import HV
+
+# 项目根目录（LocalSearch/ 的上一级）
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ====== pymoo核心类 ====== #
 from pymoo.core.problem import Problem
@@ -14,7 +18,7 @@ from pymoo.optimize import minimize
 
 # ====== 引入你已有的compute_delay函数或常量 ====== #
 # 假设你的 compute_delay.py 就在同级目录:
-from compute_delay import (
+from LocalSearch.compute_delay import (
     SERVICE_DEPLOY_COSTS,         # [100, 120, 80, ...] 每类服务的部署费用
     SERVICE_CAPACITY_PER_SERVER,  # 每台服务器最多可部署几个服务
     SERVICE_WORKLOADS,            # 各类服务的计算量
@@ -95,7 +99,7 @@ def visualize_detailed_hybrid_process(server_id, candidate_data):
 
     # 保存 Stage 1
     plt.tight_layout()
-    filename1 = f"hybrid_process_stage1_server_{server_id}.pdf"
+    filename1 = os.path.join(PROJECT_ROOT, f"output/pdf/hybrid_process_stage1_server_{server_id}.pdf")
     plt.savefig(filename1, format='pdf', bbox_inches='tight')
     plt.close()
     print(f"✅ 生成 Stage 1 图表 (无标注): {filename1}")
@@ -106,35 +110,72 @@ def visualize_detailed_hybrid_process(server_id, candidate_data):
     plt.figure(figsize=(8, 6))
     ax2 = plt.gca()
 
-    # 绘制普通柱状图 (竖向)
-    # 颜色由 bar_colors 控制 (红/蓝/灰)
-    bars = ax2.bar(x_pos, totals, color=bar_colors, edgecolor='black',
-                   alpha=0.9, width=0.6, zorder=3, linewidth=0.5)
+    # --- 1. 确定三个区域的边界索引 ---
+    top_n_count = sum(1 for s in statuses if s == 'Top-N')
+    random_count = sum(1 for s in statuses if s == 'Random')
+    # 区域分界线: Top-N | Random | Discarded
+    boundary_1 = top_n_count - 0.5          # Top-N 与 Random 之间
+    boundary_2 = top_n_count + random_count - 0.5  # Random 与 Discarded 之间
+
+    # --- 2. 绘制区域背景色 (zorder=0，在最底层) ---
+    ax2.axvspan(-0.5, boundary_1, facecolor='#FF7675', alpha=0.08, zorder=0)
+    ax2.axvspan(boundary_1, boundary_2, facecolor='#74B9FF', alpha=0.08, zorder=0)
+    ax2.axvspan(boundary_2, len(data) - 0.5, facecolor='#B0B0B0', alpha=0.08, zorder=0)
+
+    # --- 3. 绘制柱状图 ---
+    bar_width = 0.6
+    for idx_bar in range(len(data)):
+        s = statuses[idx_bar]
+        if s == 'Discarded':
+            # Discarded: 用斜线填充 + 低透明度，视觉上表达"被淘汰"
+            ax2.bar(x_pos[idx_bar], totals[idx_bar], color='#E5E7E9',
+                    edgecolor='gray', alpha=0.5, width=bar_width, zorder=3,
+                    linewidth=0.8, hatch='///')
+        else:
+            ax2.bar(x_pos[idx_bar], totals[idx_bar], color=bar_colors[idx_bar],
+                    edgecolor='black', alpha=0.9, width=bar_width, zorder=3,
+                    linewidth=0.5)
+
+    # --- 4. 绘制区域分隔虚线 ---
+    ax2.axvline(x=boundary_1, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=2)
+    ax2.axvline(x=boundary_2, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=2)
+
+    # --- 5. 添加区域标注 (图表顶部) ---
+    y_top = ax2.get_ylim()[1] if ax2.get_ylim()[1] > max(totals) * 1.1 else max(totals) * 1.15
+    ax2.set_ylim(top=y_top)
+    label_y = y_top * 0.95
+
+    ax2.text((0 + boundary_1) / 2 - 0.25, label_y, 'Deterministic',
+             fontsize=12, fontweight='bold', color='#D63031',
+             ha='center', va='top', zorder=5)
+    ax2.text((boundary_1 + boundary_2) / 2, label_y, 'Random Pool',
+             fontsize=12, fontweight='bold', color='#0984E3',
+             ha='center', va='top', zorder=5)
+    if boundary_2 < len(data) - 0.5:
+        ax2.text((boundary_2 + len(data) - 0.5) / 2, label_y, 'Discarded',
+                 fontsize=12, fontweight='bold', color='#7F8C8D',
+                 ha='center', va='top', zorder=5)
 
     # --- 样式设置 ---
-    # X轴 (与 Stage 1 完全对齐)
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels([f"Service {i}" for i in ids], fontsize=16, rotation=0)
-
-    # Y轴
     plt.yticks(fontsize=16)
     plt.ylabel("Total Hybrid Score", fontname='Arial', fontsize=18)
 
     # 网格线
-    ax2.grid(axis='y', linestyle='--', linewidth=0.75, alpha=0.7, zorder=0)
+    ax2.grid(axis='y', linestyle='--', linewidth=0.75, alpha=0.7, zorder=1)
 
     # 手动构建图例 (右上角)
     legend_patches = [
-        mpatches.Patch(color='#FF7675', label='Top-N Deterministic'),  # 对应上面的 Top-N 颜色
-        mpatches.Patch(color='#74B9FF', label='Randomly Filled'),  # 对应上面的 Random 颜色
-        mpatches.Patch(color='#E5E7E9', label='Discarded')  # 对应上面的 Discarded 颜色
+        mpatches.Patch(color='#FF7675', label='Top-N'),
+        mpatches.Patch(color='#74B9FF', label='Random'),
+        mpatches.Patch(facecolor='#E5E7E9', edgecolor='gray', label='Discarded', hatch='///'),
     ]
-    # 因为是降序排列，右上角通常是空白的，放图例非常合适
     ax2.legend(handles=legend_patches, loc='upper right', fontsize=14, frameon=True, edgecolor='lightgray', framealpha=1)
 
     # 保存 Stage 2
     plt.tight_layout()
-    filename2 = f"hybrid_process_stage2_server_{server_id}.pdf"
+    filename2 = os.path.join(PROJECT_ROOT, f"output/pdf/hybrid_process_stage2_server_{server_id}.pdf")
     plt.savefig(filename2, format='pdf', bbox_inches='tight')
     plt.close()
     print(f"✅ 生成 Stage 2 图表 (竖版无标注): {filename2}")
@@ -350,7 +391,7 @@ class ServiceSampling(Sampling):
         num_svc = problem.num_services
         n_var = k * num_svc
         cap = SERVICE_CAPACITY_PER_SERVER
-        from service_selection_strategies import (
+        from LocalSearch.service_selection_strategies import (
             greedy_service_deployment_by_cost,
             greedy_service_deployment_by_request
         )
@@ -529,7 +570,7 @@ class ServiceSampling(Sampling):
                 problem.user_services, problem.assigned_server
             )
 
-            from service_selection_strategies import compute_objectives
+            from LocalSearch.service_selection_strategies import compute_objectives
 
             alpha = 0.5
             beta = 0.5
@@ -892,7 +933,7 @@ class ServiceSampling(Sampling):
                 problem.user_services, problem.assigned_server
             )
 
-            from service_selection_strategies import compute_objectives
+            from LocalSearch.service_selection_strategies import compute_objectives
 
             alpha = 0.5
             beta = 0.5
@@ -1001,7 +1042,7 @@ class ServiceSampling(Sampling):
         #         problem.user_services, problem.assigned_server
         #     )
         #
-        #     from service_selection_strategies import compute_objectives
+        #     from LocalSearch.service_selection_strategies import compute_objectives
         #
         #     alpha = 0.5  # cost占比
         #     beta = 0.5  # request占比
@@ -1264,7 +1305,7 @@ def analyze_nsga_result(result, k, num_svc=8, a=0.5, b=0.5):
             print(f"  Server {j} => 服务 {deployed_svcs.tolist()}")
 
 
-from service_selection_strategies import (
+from LocalSearch.service_selection_strategies import (
     random_service_deployment,
     greedy_service_deployment_by_cost,
     greedy_service_deployment_by_request
@@ -1318,14 +1359,14 @@ if __name__ == "__main__":
     print("用户首选服务器(assignment):", assignment[:10], "...")
 
     strategies = {
-        "random": "res_random.npz",
-        "greedy_cost": "res_greedy_cost.npz",
-        "greedy_request": "res_greedy_request.npz",
-        "hybrid-A-1": "res_hybrid-A-1.npz",
-        # "hybrid": "res_hybrid.npz",
-        # "hybrid-A": "res_hybrid-A.npz",
-        # "hybrid-B": "res_hybrid-B.npz",
-        # "hybrid-C": "res_hybrid-C.npz"
+        "random": os.path.join(PROJECT_ROOT, "output/npz/res_random.npz"),
+        "greedy_cost": os.path.join(PROJECT_ROOT, "output/npz/res_greedy_cost.npz"),
+        "greedy_request": os.path.join(PROJECT_ROOT, "output/npz/res_greedy_request.npz"),
+        "hybrid-A-1": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-A-1.npz"),
+        # "hybrid": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid.npz"),
+        # "hybrid-A": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-A.npz"),
+        # "hybrid-B": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-B.npz"),
+        # "hybrid-C": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-C.npz"),
     }
 
     for mode, filename in strategies.items():

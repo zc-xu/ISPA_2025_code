@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import random
 import math
@@ -9,9 +10,12 @@ from matplotlib import image as mpimg
 from matplotlib.patches import Circle
 import matplotlib.ticker as mticker
 
+# 项目根目录（main.py 所在目录），确保无论从哪里运行都能找到文件
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 # ========== 来自你的新版本 compute_delay.py 的导入 ==========
 # 注意：根据你在 compute_delay.py 中定义的函数/常量灵活调整
-from compute_delay import (
+from LocalSearch.compute_delay import (
     haversine_distance,
     compute_user_delay,
     total_delay,
@@ -46,7 +50,8 @@ def haversine_distance(lon1, lat1, lon2, lat2):
 
 
 
-def load_input_from_excel(path="input_data.xlsx"):
+def load_input_from_excel(path="data/input_data.xlsx"):
+    path = os.path.join(PROJECT_ROOT, path)
     # 加载服务器位置
     df_candidates = pd.read_excel(path, sheet_name="candidates")
     candidate_positions = df_candidates.to_numpy()
@@ -61,7 +66,7 @@ def load_input_from_excel(path="input_data.xlsx"):
 
     return candidate_positions, user_positions, user_services
 
-candidate_positions, user_positions, user_services = load_input_from_excel("input_data_10_130_8_new.xlsx")
+candidate_positions, user_positions, user_services = load_input_from_excel("data/input_data_10_130_8_new.xlsx")
 # 示例写入
 
 
@@ -274,7 +279,7 @@ def plot_final_solution(k, best_solution, best_cost, coverage_radius, feasible):
 
     plt.figure(figsize=(8, 7))
     # === 加载背景图 ===
-    bg_img = mpimg.imread("C:/Users/m1870/Desktop/background.jpg")
+    bg_img = mpimg.imread(os.path.join(PROJECT_ROOT, "assets/background.jpg"))
     min_lon = np.min(np.concatenate((candidate_positions[:, 0], user_positions[:, 0]))) - 0.005
     max_lon = np.max(np.concatenate((candidate_positions[:, 0], user_positions[:, 0]))) + 0.005
     min_lat = np.min(np.concatenate((candidate_positions[:, 1], user_positions[:, 1]))) - 0.005
@@ -372,7 +377,7 @@ def plot_final_solution(k, best_solution, best_cost, coverage_radius, feasible):
 
     # 避免科学计数
     plt.ticklabel_format(useOffset=False, style='plain')
-    # plt.savefig('trace_data.pdf', format='pdf', bbox_inches='tight')
+    # plt.savefig(os.path.join(PROJECT_ROOT, 'output/pdf/trace_data.pdf'), format='pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -423,7 +428,7 @@ def multi_k_experiment(k_values, coverage_radius=1):
                             rotation=90, fontsize=15, va='bottom')
 
                 ax.grid(True, axis='y', linestyle='--', linewidth=0.75)
-                plt.savefig('iteration_data.pdf', format='pdf', bbox_inches='tight')
+                plt.savefig(os.path.join(PROJECT_ROOT, 'output/pdf/iteration_data.pdf'), format='pdf', bbox_inches='tight')
                 plt.show()
 
             # if iteration_log:
@@ -515,7 +520,7 @@ def multi_k_experiment(k_values, coverage_radius=1):
 
 
 # 导入刚刚我们实现的策略函数
-from station_selection_strategies import (
+from LocalSearch.station_selection_strategies import (
     random_selection,
     density_based_selection,
     distance_sum_selection,

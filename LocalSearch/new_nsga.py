@@ -12,7 +12,7 @@ from pymoo.optimize import minimize
 
 # ====== 引入你已有的compute_delay函数或常量 ====== #
 # 假设你的 compute_delay.py 就在同级目录:
-from compute_delay import (
+from LocalSearch.compute_delay import (
     SERVICE_DEPLOY_COSTS,         # [100, 120, 80, ...] 每类服务的部署费用
     SERVICE_CAPACITY_PER_SERVER,  # 每台服务器最多可部署几个服务
     SERVICE_WORKLOADS,            # 各类服务的计算量
@@ -24,7 +24,7 @@ from compute_delay import (
     haversine_distance
 )
 
-from service_selection_strategies import (
+from LocalSearch.service_selection_strategies import (
     greedy_service_deployment_by_cost,
     greedy_service_deployment_by_request
 )
@@ -385,7 +385,7 @@ def analyze_nsga_result(result, k, num_svc=8, a=0.5, b=0.5):
             print(f"  Server {j} => 服务 {deployed_svcs.tolist()}")
 
 
-from service_selection_strategies import (
+from LocalSearch.service_selection_strategies import (
     random_service_deployment,
     greedy_service_deployment_by_cost,
     greedy_service_deployment_by_request
