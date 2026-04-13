@@ -4,7 +4,7 @@ import numpy as np
 import random
 
 # 引入 NSGA-II 中用到的常量和函数（假设 compute_delay.py 中已定义）
-from compute_delay import (
+from LocalSearch.compute_delay import (
     SERVICE_DEPLOY_COSTS,         # 例如 [100, 120, 80, ...]
     SERVICE_CAPACITY_PER_SERVER,  # 每台服务器最多可部署的服务数（如 3）
     SERVICE_WORKLOADS,            # 各类服务的计算量

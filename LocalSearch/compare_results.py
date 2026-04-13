@@ -1,8 +1,12 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pymoo.indicators.hv import HV
 import matplotlib
 import pandas as pd
+
+# 项目根目录（LocalSearch/ 的上一级）
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 plt.rcParams['font.family'] = 'Arial'
 # matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
@@ -17,15 +21,15 @@ def normalize(F, global_min=None, global_max=None):
 
 def compare_four_saved_results_normalized(a=0.5, b=0.5, save_excel=True):
     files = {
-        "NS-P": "res_random.npz",
-        # "hybrid": "res_hybrid.npz",
-        # "hybrid-A": "res_hybrid-A.npz",
+        "NS-P": os.path.join(PROJECT_ROOT, "output/npz/res_random.npz"),
+        # "hybrid": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid.npz"),
+        # "hybrid-A": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-A.npz"),
 
-        # "hybrid-B": "res_hybrid-B.npz",
-        # "hybrid-C": "res_hybrid-C.npz",
-        "GCP": "res_greedy_cost.npz",
-        "GDP": "res_greedy_request.npz",
-        "PSP": "res_hybrid-A-1.npz",
+        # "hybrid-B": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-B.npz"),
+        # "hybrid-C": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-C.npz"),
+        "GCP": os.path.join(PROJECT_ROOT, "output/npz/res_greedy_cost.npz"),
+        "GDP": os.path.join(PROJECT_ROOT, "output/npz/res_greedy_request.npz"),
+        "PSP": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-A-1.npz"),
     }
 
     colors = {
@@ -59,7 +63,7 @@ def compare_four_saved_results_normalized(a=0.5, b=0.5, save_excel=True):
 
     # Excel writer 初始化
     if save_excel:
-        writer = pd.ExcelWriter("nsga2_normalized_results20.xlsx", engine='xlsxwriter')
+        writer = pd.ExcelWriter(os.path.join(PROJECT_ROOT, "output/excel/nsga2_normalized_results20.xlsx"), engine='xlsxwriter')
 
     for label, F in raw_data.items():
         F_norm = normalize(F, global_min, global_max)
@@ -90,7 +94,7 @@ def compare_four_saved_results_normalized(a=0.5, b=0.5, save_excel=True):
 
     if save_excel:
         writer.close()
-        print("✅ 已保存结果至 nsga2_normalized_results10.xlsx")
+        print("✅ 已保存结果至 output/excel/nsga2_normalized_results20.xlsx")
 
     # 绘图
     plt.figure(figsize=(7, 5.5))
@@ -108,7 +112,7 @@ def compare_four_saved_results_normalized(a=0.5, b=0.5, save_excel=True):
     plt.legend(fontsize=23)
     plt.grid(True, axis='y', linestyle='--', linewidth=0.75)
     plt.tight_layout()
-    plt.savefig('nsga_data_10_130_new2.pdf', format='pdf', bbox_inches='tight')
+    plt.savefig(os.path.join(PROJECT_ROOT, 'output/pdf/nsga_data_10_130_new2.pdf'), format='pdf', bbox_inches='tight')
     plt.show()
 
 if __name__ == "__main__":

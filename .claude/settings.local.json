@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls D:/pythonProject/LocalSearch/*.py)",
+      "Bash(grep -E \"\\\\.dist-info$\")",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(cp LocalSearch/hybrid_process_*.pdf output/pdf/)",
+      "Bash(cp iteration_data.pdf output/pdf/)",
+      "Bash(cp LocalSearch/output/npz/* output/npz/)",
+      "Bash(cp LocalSearch/output/pdf/* output/pdf/)",
+      "Bash(cp LocalSearch/output/excel/* output/excel/)",
+      "Bash(cp LocalSearch/output/img.png output/)",
+      "Bash(cp LocalSearch/new.py misc/)",
+      "Bash(cp LocalSearch/jueceshu.py misc/)",
+      "Bash(cp LocalSearch/js.py misc/)",
+      "Bash(rm -rf LocalSearch/data/)",
+      "Bash(rm -f LocalSearch/res_*.npz)",
+      "Bash(rm -f LocalSearch/hybrid_process_*.pdf)",
+      "Bash(rm -f LocalSearch/background.jpg)",
+      "Bash(rm -f LocalSearch/new.py LocalSearch/jueceshu.py LocalSearch/js.py)",
+      "Bash(rm:*)",
+      "Bash(ls LocalSearch/*.py)",
+      "Bash(LocalSearch/Scripts/python -c \"from LocalSearch.compute_delay import haversine_distance; print\\('compute_delay import OK'\\)\")",
+      "Bash(LocalSearch/Scripts/python -c \"from LocalSearch.station_selection_strategies import random_selection; print\\('station_selection import OK'\\)\")",
+      "Bash(LocalSearch/Scripts/python -c \"from LocalSearch.service_selection_strategies import compute_objectives; print\\('service_selection import OK'\\)\")",
+      "Bash(LocalSearch/Scripts/python -c ':*)",
+      "Bash(D:/pythonProject/LocalSearch/Scripts/python -c ':*)"
+    ]
+  }
+}

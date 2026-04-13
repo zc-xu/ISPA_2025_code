@@ -1,8 +1,12 @@
+import os
 import numpy as np
 np.set_printoptions(threshold=np.inf, linewidth=200)
 import random
 import matplotlib.pyplot as plt
 from pymoo.indicators.hv import HV
+
+# 项目根目录（LocalSearch/ 的上一级）
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ====== pymoo核心类 ====== #
 from pymoo.core.problem import Problem
@@ -14,7 +18,7 @@ from pymoo.optimize import minimize
 
 # ====== 引入你已有的compute_delay函数或常量 ====== #
 # 假设你的 compute_delay.py 就在同级目录:
-from compute_delay import (
+from LocalSearch.compute_delay import (
     SERVICE_DEPLOY_COSTS,         # [100, 120, 80, ...] 每类服务的部署费用
     SERVICE_CAPACITY_PER_SERVER,  # 每台服务器最多可部署几个服务
     SERVICE_WORKLOADS,            # 各类服务的计算量
@@ -26,8 +30,155 @@ from compute_delay import (
     haversine_distance
 )
 
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np
+
+# --- 全局字体设置 (确保与 main.py 风格一致) ---
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['axes.unicode_minus'] = False
 
 
+def visualize_detailed_hybrid_process(server_id, candidate_data):
+    """
+    绘制 Hybrid-A-1 的详细全流程图 (两张独立竖向柱状图，无标注，统一样式)
+    """
+    # 1. 数据准备：按总分从高到低排序
+    data = sorted(candidate_data, key=lambda x: x['total'], reverse=True)
+
+    ids = [str(d['id']) for d in data]
+    cost_parts = [d['cost_part'] for d in data]
+    req_parts = [d['req_part'] for d in data]
+    totals = [d['total'] for d in data]
+    statuses = [d['status'] for d in data]
+
+    # ==========================
+    # 🎨 颜色设置区域 (已调亮)
+    # ==========================
+    # Stage 1: 柔和的浅紫 & 浅橙
+    color_cost = '#BB8FCE'  # 浅紫色 (Lighter Purple)
+    color_req = '#F8C471'  # 浅橙色 (Lighter Orange)
+
+    # Stage 2: 清新的红、蓝、灰
+    status_colors = {
+        'Top-N': '#FF7675',  # 浅红色 (Soft Red)
+        'Random': '#74B9FF',  # 浅蓝色 (Soft Blue)
+        'Discarded': '#E5E7E9'  # 极浅灰 (Very Light Gray) - 这样如果不选中几乎看不见，很干净
+    }
+    bar_colors = [status_colors[s] for s in statuses]
+
+    x_pos = np.arange(len(data))
+
+    # =========================================================
+    # 图表 1: [Stage 1] 评分来源分解 (Score Breakdown)
+    # =========================================================
+    plt.figure(figsize=(8, 6))
+    ax1 = plt.gca()
+
+    # 绘制堆叠柱状图 (竖向)
+    # zorder=3 保证柱子在网格线上方
+    p1 = ax1.bar(x_pos, cost_parts, color=color_cost, label=r'Cost Score ($\alpha \cdot W_{cost}$)',
+                 alpha=0.85, width=0.6, zorder=3, edgecolor='black', linewidth=0.5)
+    p2 = ax1.bar(x_pos, req_parts, bottom=cost_parts, color=color_req, label=r'Request Score ($\beta \cdot W_{req}$)',
+                 alpha=0.85, width=0.6, zorder=3, edgecolor='black', linewidth=0.5)
+
+    # --- 样式设置 ---
+    # X轴
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels([f"Service {i}" for i in ids], fontsize=16, rotation=0)
+
+    # Y轴
+    plt.yticks(fontsize=16)
+    plt.ylabel("Weighted Score", fontname='Arial', fontsize=18)
+
+    # 网格线 (放在最底层)
+    ax1.grid(axis='y', linestyle='--', linewidth=0.75, alpha=0.7, zorder=0)
+
+    # 图例 (右上角)
+    ax1.legend(loc='upper right', fontsize=14, frameon=True, edgecolor='lightgray', framealpha=1)
+
+    # 保存 Stage 1
+    plt.tight_layout()
+    filename1 = os.path.join(PROJECT_ROOT, f"output/pdf/hybrid_process_stage1_server_{server_id}.pdf")
+    plt.savefig(filename1, format='pdf', bbox_inches='tight')
+    plt.close()
+    print(f"✅ 生成 Stage 1 图表 (无标注): {filename1}")
+
+    # =========================================================
+    # 图表 2: [Stage 2] 选择逻辑 (Selection Logic) - 改为竖向
+    # =========================================================
+    plt.figure(figsize=(8, 6))
+    ax2 = plt.gca()
+
+    # --- 1. 确定三个区域的边界索引 ---
+    top_n_count = sum(1 for s in statuses if s == 'Top-N')
+    random_count = sum(1 for s in statuses if s == 'Random')
+    # 区域分界线: Top-N | Random | Discarded
+    boundary_1 = top_n_count - 0.5          # Top-N 与 Random 之间
+    boundary_2 = top_n_count + random_count - 0.5  # Random 与 Discarded 之间
+
+    # --- 2. 绘制区域背景色 (zorder=0，在最底层) ---
+    ax2.axvspan(-0.5, boundary_1, facecolor='#FF7675', alpha=0.08, zorder=0)
+    ax2.axvspan(boundary_1, boundary_2, facecolor='#74B9FF', alpha=0.08, zorder=0)
+    ax2.axvspan(boundary_2, len(data) - 0.5, facecolor='#B0B0B0', alpha=0.08, zorder=0)
+
+    # --- 3. 绘制柱状图 ---
+    bar_width = 0.6
+    for idx_bar in range(len(data)):
+        s = statuses[idx_bar]
+        if s == 'Discarded':
+            # Discarded: 用斜线填充 + 低透明度，视觉上表达"被淘汰"
+            ax2.bar(x_pos[idx_bar], totals[idx_bar], color='#E5E7E9',
+                    edgecolor='gray', alpha=0.5, width=bar_width, zorder=3,
+                    linewidth=0.8, hatch='///')
+        else:
+            ax2.bar(x_pos[idx_bar], totals[idx_bar], color=bar_colors[idx_bar],
+                    edgecolor='black', alpha=0.9, width=bar_width, zorder=3,
+                    linewidth=0.5)
+
+    # --- 4. 绘制区域分隔虚线 ---
+    ax2.axvline(x=boundary_1, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=2)
+    ax2.axvline(x=boundary_2, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=2)
+
+    # --- 5. 添加区域标注 (图表顶部) ---
+    y_top = ax2.get_ylim()[1] if ax2.get_ylim()[1] > max(totals) * 1.1 else max(totals) * 1.15
+    ax2.set_ylim(top=y_top)
+    label_y = y_top * 0.95
+
+    ax2.text((0 + boundary_1) / 2 - 0.25, label_y, 'Deterministic',
+             fontsize=12, fontweight='bold', color='#D63031',
+             ha='center', va='top', zorder=5)
+    ax2.text((boundary_1 + boundary_2) / 2, label_y, 'Random Pool',
+             fontsize=12, fontweight='bold', color='#0984E3',
+             ha='center', va='top', zorder=5)
+    if boundary_2 < len(data) - 0.5:
+        ax2.text((boundary_2 + len(data) - 0.5) / 2, label_y, 'Discarded',
+                 fontsize=12, fontweight='bold', color='#7F8C8D',
+                 ha='center', va='top', zorder=5)
+
+    # --- 样式设置 ---
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels([f"Service {i}" for i in ids], fontsize=16, rotation=0)
+    plt.yticks(fontsize=16)
+    plt.ylabel("Total Hybrid Score", fontname='Arial', fontsize=18)
+
+    # 网格线
+    ax2.grid(axis='y', linestyle='--', linewidth=0.75, alpha=0.7, zorder=1)
+
+    # 手动构建图例 (右上角)
+    legend_patches = [
+        mpatches.Patch(color='#FF7675', label='Top-N'),
+        mpatches.Patch(color='#74B9FF', label='Random'),
+        mpatches.Patch(facecolor='#E5E7E9', edgecolor='gray', label='Discarded', hatch='///'),
+    ]
+    ax2.legend(handles=legend_patches, loc='upper right', fontsize=14, frameon=True, edgecolor='lightgray', framealpha=1)
+
+    # 保存 Stage 2
+    plt.tight_layout()
+    filename2 = os.path.join(PROJECT_ROOT, f"output/pdf/hybrid_process_stage2_server_{server_id}.pdf")
+    plt.savefig(filename2, format='pdf', bbox_inches='tight')
+    plt.close()
+    print(f"✅ 生成 Stage 2 图表 (竖版无标注): {filename2}")
 ###############################################################
 #  (1) Problem定义: MyServiceDeployProblem
 ###############################################################
@@ -229,188 +380,6 @@ class ServiceRepair(Repair):
 
         return X
 
-###############################################################
-#  (3) Sampling: 初始种群 (0/1) + 修复
-###############################################################
-# class ServiceSampling(Sampling):
-#     def _do(self, problem, n_samples, **kwargs):
-#         k = problem.k
-#         num_svc = problem.num_services
-#         n_var = k * num_svc
-#
-#         # 初步随机 0/1
-#         X = np.random.randint(0,2,size=(n_samples,n_var)).astype(float)
-#         print(X)
-#         return X
-# class ServiceSampling(Sampling):
-#     def __init__(self, mode="random"):
-#         super().__init__()
-#         self.mode = mode
-#
-#     def _do(self, problem, n_samples, **kwargs):
-#         k = problem.k
-#         num_svc = problem.num_services
-#         n_var = k * num_svc
-#         cap = SERVICE_CAPACITY_PER_SERVER
-#         print("当前 cap:", cap)  # 期望为 3 或 4
-#
-#         from service_selection_strategies import (
-#             greedy_service_deployment_by_cost,
-#             greedy_service_deployment_by_request
-#         )
-#
-#         X = np.zeros((n_samples, n_var))
-#         if self.mode == "random":
-#             np.random.seed(42)
-#             for i in range(n_samples):
-#                 mat = np.zeros((k, num_svc), dtype=int)
-#                 for j in range(k):
-#                     # svc_indices = list(range(num_svc))
-#                     svc_indices = np.random.permutation(num_svc)  # ✅ 替代 random.shuffle
-#                     random.shuffle(svc_indices)
-#                     selected = svc_indices[:cap]
-#                     mat[j, selected] = 1
-#                 X[i] = mat.flatten()
-#
-#         elif self.mode == "hybrid":
-#             cost_mat, _, _, _ = greedy_service_deployment_by_cost(
-#                 problem.servers_pos,
-#                 problem.user_positions,
-#                 problem.user_services,
-#                 problem.assigned_server
-#             )
-#             req_mat, _, _, _ = greedy_service_deployment_by_request(
-#                 problem.servers_pos,
-#                 problem.user_positions,
-#                 problem.user_services,
-#                 problem.assigned_server
-#             )
-#
-#             base_merged = np.zeros((k, num_svc), dtype=int)
-#
-#             for j in range(k):
-#                 # 获取 cost 策略排序
-#                 cost_order = sorted(
-#                     [idx for idx, val in enumerate(cost_mat[j]) if val == 1],
-#                     key=lambda x: SERVICE_DEPLOY_COSTS[x]
-#                 )
-#                 # 获取 request 策略排序
-#                 user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
-#                 freq = {svc: 0 for svc in range(num_svc)}
-#                 for u in user_indices:
-#                     freq[problem.user_services[u]] += 1
-#                 request_order = sorted(
-#                     [idx for idx, val in enumerate(req_mat[j]) if val == 1],
-#                     key=lambda x: -freq[x]  # 越多人请求优先级越高
-#                 )
-#
-#                 # 合并并去重后排序（先 cost_order 后 request_order）
-#                 merged = []
-#                 seen = set()
-#                 for idx in cost_order + request_order:
-#                     if idx not in seen:
-#                         merged.append(idx)
-#                         seen.add(idx)
-#
-#                 # 若超过容量，从后往前随机剔除
-#                 selected = merged.copy()
-#                 while len(selected) > SERVICE_CAPACITY_PER_SERVER:
-#                     candidates = selected[-2:] if len(selected) >= 2 else selected[-1:]
-#                     drop = random.choice(candidates)
-#                     selected.remove(drop)
-#
-#                 for idx in selected:
-#                     base_merged[j, idx] = 1
-#
-#             # 加扰动构造 n_samples
-#             for i in range(n_samples):
-#                 if random.random() < 0.2:
-#                     mat = np.copy(base_merged)
-#                 else:
-#                     mat = np.copy(base_merged)
-#                     for j in range(k):
-#                         replace_count = random.randint(1, 2)
-#                         for _ in range(replace_count):
-#                             ones = np.where(mat[j] == 1)[0]
-#                             zeros = np.where(mat[j] == 0)[0]
-#                             if len(ones) > 0 and len(zeros) > 0:
-#                                 drop = random.choice(ones)
-#                                 add = random.choice(zeros)
-#                                 mat[j, drop] = 0
-#                                 mat[j, add] = 1
-#                 X[i] = mat.flatten()
-#             print(X)
-#
-#         elif self.mode == "greedy_cost":
-#             base_mat, _, _, _ = greedy_service_deployment_by_cost(
-#                 problem.servers_pos,
-#                 problem.user_positions,
-#                 problem.user_services,
-#                 problem.assigned_server
-#             )
-#             for i in range(n_samples):
-#                 mat = np.copy(base_mat)
-#
-#                 for j in range(k):
-#                     # 有10%概率直接随机重置本服务器部署
-#                     if random.random() < 0.1:
-#                         svc_indices = list(range(num_svc))
-#                         random.shuffle(svc_indices)
-#                         mat[j] = np.zeros(num_svc, dtype=int)
-#                         for idx in svc_indices[:cap]:
-#                             mat[j, idx] = 1
-#                         continue
-#
-#                     # 否则执行强扰动（翻转4~6个服务位）
-#                     flip_count = random.randint(4, 5)
-#                     flip_idx = np.random.choice(num_svc, size=flip_count, replace=False)
-#                     for idx in flip_idx:
-#                         mat[j, idx] ^= 1
-#
-#                     # 修复部署上限
-#                     while np.sum(mat[j]) > cap:
-#                         ones = np.where(mat[j] == 1)[0]
-#                         mat[j, random.choice(ones)] = 0
-#
-#                 X[i] = mat.flatten()
-#
-#         elif self.mode == "greedy_request":
-#             base_mat, _, _, _ = greedy_service_deployment_by_request(
-#                 problem.servers_pos,
-#                 problem.user_positions,
-#                 problem.user_services,
-#                 problem.assigned_server
-#             )
-#             for i in range(n_samples):
-#                 mat = np.copy(base_mat)
-#
-#                 for j in range(k):
-#                     # 有10%概率直接随机重置本服务器部署
-#                     if random.random() < 0.1:
-#                         svc_indices = list(range(num_svc))
-#                         random.shuffle(svc_indices)
-#                         mat[j] = np.zeros(num_svc, dtype=int)
-#                         for idx in svc_indices[:cap]:
-#                             mat[j, idx] = 1
-#                         continue
-#
-#                     # 否则执行强扰动（翻转3~5个服务位）
-#                     flip_count = random.randint(5, 6)
-#                     flip_idx = np.random.choice(num_svc, size=flip_count, replace=False)
-#                     for idx in flip_idx:
-#                         mat[j, idx] ^= 1
-#
-#                     # 修复部署上限
-#                     while np.sum(mat[j]) > cap:
-#                         ones = np.where(mat[j] == 1)[0]
-#                         mat[j, random.choice(ones)] = 0
-#
-#                 X[i] = mat.flatten()
-#
-#         else:
-#             raise ValueError(f"Unsupported sampling mode: {self.mode}")
-#
-#         return X
 
 class ServiceSampling(Sampling):
     def __init__(self, mode="random"):
@@ -422,7 +391,7 @@ class ServiceSampling(Sampling):
         num_svc = problem.num_services
         n_var = k * num_svc
         cap = SERVICE_CAPACITY_PER_SERVER
-        from service_selection_strategies import (
+        from LocalSearch.service_selection_strategies import (
             greedy_service_deployment_by_cost,
             greedy_service_deployment_by_request
         )
@@ -577,43 +546,7 @@ class ServiceSampling(Sampling):
 
             return X
 
-        # def perturb_with_anchor(mat, anchors):
-        #     new_mat = np.copy(mat)
-        #     for j in range(k):
-        #         anchor = anchors[j]
-        #         ones = np.where(new_mat[j] == 1)[0]
-        #         zeros = np.where(new_mat[j] == 0)[0]
-        #
-        #         # 移除 anchor（从 ones 和 zeros 中排除）
-        #         ones = [s for s in ones if s != anchor]
-        #         zeros = [s for s in zeros if s != anchor]
-        #
-        #         replace_count = random.randint(1, 2)
-        #         for _ in range(replace_count):
-        #             if ones and zeros:
-        #                 drop = random.choice(ones)
-        #                 add = random.choice(zeros)
-        #                 new_mat[j, drop] = 0
-        #                 new_mat[j, add] = 1
-        #     return new_mat
-        # def expand_population_with_anchor(base_mat, anchors):
-        #     X = np.zeros((n_samples, n_var))
-        #     for i in range(n_samples):
-        #         if i == 0:
-        #             mat = base_mat
-        #             print("\n🔍 初始解（第一个个体）:\n", mat)
-        #         else:
-        #             mat = perturb_with_anchor(base_mat, anchors)
-        #         X[i] = mat.flatten()
-        #     return X
-        # 1. 随机策略
-        # if self.mode == "random":
-        #     base_mat = np.zeros((k, num_svc), dtype=int)
-        #     for j in range(k):
-        #         svc_indices = np.random.permutation(num_svc)
-        #         selected = svc_indices[:cap]
-        #         base_mat[j, selected] = 1
-        #     return expand_population(base_mat)
+
         if self.mode == "random":
             base_mat = np.zeros((k, num_svc), dtype=int)
             anchor_services = []
@@ -627,285 +560,6 @@ class ServiceSampling(Sampling):
             return expand_population_random(base_mat)
 
 
-        # elif self.mode == "hybrid":
-        #
-        #     from service_selection_strategies import (
-        #
-        #         greedy_service_deployment_by_cost,
-        #
-        #         greedy_service_deployment_by_request,
-        #
-        #         compute_objectives
-        #
-        #     )
-        #
-        #     alpha = 0.5  # 成本权重
-        #
-        #     beta = 0.5  # 延迟权重
-        #
-        #     # 1. 先生成三种基础部署方案
-        #
-        #     base_random = np.zeros((k, num_svc), dtype=int)
-        #
-        #     for j in range(k):
-        #         svc_indices = np.random.permutation(num_svc)
-        #
-        #         selected = svc_indices[:cap]
-        #
-        #         base_random[j, selected] = 1
-        #
-        #     base_cost, _, _, _ = greedy_service_deployment_by_cost(
-        #
-        #         problem.servers_pos, problem.user_positions,
-        #
-        #         problem.user_services, problem.assigned_server
-        #
-        #     )
-        #
-        #     base_request, _, _, _ = greedy_service_deployment_by_request(
-        #
-        #         problem.servers_pos, problem.user_positions,
-        #
-        #         problem.user_services, problem.assigned_server
-        #
-        #     )
-        #
-        #     # 2. 分别计算每个服务器行的 cost 和 delay
-        #
-        #     costs_r, delays_r = [], []
-        #
-        #     costs_c, delays_c = [], []
-        #
-        #     costs_req, delays_req = [], []
-        #
-        #     for j in range(k):
-        #         c_r, d_r = compute_objectives(base_random[j:j + 1, :], problem.servers_pos[j:j + 1],
-        #
-        #                                       problem.user_positions, problem.user_services, problem.assigned_server)
-        #
-        #         costs_r.append(c_r)
-        #
-        #         delays_r.append(d_r)
-        #
-        #         c_c, d_c = compute_objectives(base_cost[j:j + 1, :], problem.servers_pos[j:j + 1],
-        #
-        #                                       problem.user_positions, problem.user_services, problem.assigned_server)
-        #
-        #         costs_c.append(c_c)
-        #
-        #         delays_c.append(d_c)
-        #
-        #         c_req, d_req = compute_objectives(base_request[j:j + 1, :], problem.servers_pos[j:j + 1],
-        #
-        #                                           problem.user_positions, problem.user_services,
-        #                                           problem.assigned_server)
-        #
-        #         costs_req.append(c_req)
-        #
-        #         delays_req.append(d_req)
-        #
-        #     costs_r, delays_r = np.array(costs_r), np.array(delays_r)
-        #
-        #     costs_c, delays_c = np.array(costs_c), np.array(delays_c)
-        #
-        #     costs_req, delays_req = np.array(costs_req), np.array(delays_req)
-        #
-        #     # 3. 归一化
-        #
-        #     all_costs = np.concatenate([costs_r, costs_c, costs_req])
-        #
-        #     all_delays = np.concatenate([delays_r, delays_c, delays_req])
-        #
-        #     c_min, c_max = np.min(all_costs), np.max(all_costs)
-        #
-        #     d_min, d_max = np.min(all_delays), np.max(all_delays)
-        #
-        #     def norm(arr, mn, mx):
-        #
-        #         return (arr - mn) / (mx - mn + 1e-9)
-        #
-        #     cost_r_norm = norm(costs_r, c_min, c_max)
-        #
-        #     delay_r_norm = norm(delays_r, d_min, d_max)
-        #
-        #     cost_c_norm = norm(costs_c, c_min, c_max)
-        #
-        #     delay_c_norm = norm(delays_c, d_min, d_max)
-        #
-        #     cost_req_norm = norm(costs_req, c_min, c_max)
-        #
-        #     delay_req_norm = norm(delays_req, d_min, d_max)
-        #
-        #     # 4. 计算加权得分
-        #
-        #     score_r = alpha * cost_r_norm + beta * delay_r_norm
-        #
-        #     score_c = alpha * cost_c_norm + beta * delay_c_norm
-        #
-        #     score_req = alpha * cost_req_norm + beta * delay_req_norm
-        #
-        #     # 5. 按行选出最优方案组成 final_mat
-        #
-        #     final_mat = np.zeros((k, num_svc), dtype=int)
-        #
-        #     for j in range(k):
-        #
-        #         scores = [score_r[j], score_c[j], score_req[j]]
-        #
-        #         best_idx = np.argmin(scores)
-        #
-        #         if best_idx == 0:
-        #
-        #             final_mat[j] = base_random[j]
-        #
-        #         elif best_idx == 1:
-        #
-        #             final_mat[j] = base_cost[j]
-        #
-        #         else:
-        #
-        #             final_mat[j] = base_request[j]
-        #
-        #     # 6. 调用你已有的扩展种群函数生成完整初始种群
-        #
-        #     return expand_population_new(final_mat)
-
-
-
-        #新的决策方案
-        # hybrid 模式中加入两种策略比较
-        # elif self.mode == "hybrid":
-        #     cost_mat, _, _, _ = greedy_service_deployment_by_cost(
-        #         problem.servers_pos, problem.user_positions,
-        #         problem.user_services, problem.assigned_server
-        #     )
-        #     req_mat, _, _, _ = greedy_service_deployment_by_request(
-        #         problem.servers_pos, problem.user_positions,
-        #         problem.user_services, problem.assigned_server
-        #     )
-        #
-        #     from service_selection_strategies import compute_objectives
-        #
-        #     alpha = 0.5  # cost占比
-        #     beta = 0.5  # request占比
-        #     # alpha = 0.3  # cost占比
-        #     # beta = 0.7  # request占比
-        #
-        #     base_mat = np.zeros((k, num_svc), dtype=int)
-        #     print("初始随机")
-        #     print(base_mat)
-        #     anchor_services = []
-        #
-        #     for j in range(k):
-        #         # === 准备 cost_order 和 request_order ===
-        #         cost_order = sorted(
-        #             [idx for idx, val in enumerate(cost_mat[j]) if val == 1],
-        #             key=lambda x: SERVICE_DEPLOY_COSTS[x]
-        #         )
-        #         cost_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in enumerate(cost_order)}
-        #
-        #         freq = {svc: 0 for svc in range(num_svc)}
-        #         user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
-        #         for u in user_indices:
-        #             freq[problem.user_services[u]] += 1
-        #         request_order = sorted(
-        #             [idx for idx, val in enumerate(req_mat[j]) if val == 1],
-        #             key=lambda x: -freq[x]
-        #         )
-        #         request_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in
-        #                           enumerate(request_order)}
-        #
-        #         # === 生成 merged 集合 ===
-        #         merged_set = set(cost_order) | set(request_order)
-        #         merged_list = list(merged_set)
-        #
-        #         # (A) 随机删除策略
-        #         random_selected = merged_list.copy()
-        #         if len(random_selected) > cap:
-        #             random_selected = random.sample(random_selected, cap)
-        #         mat_r = np.zeros((k, num_svc), dtype=int)
-        #         for svc in random_selected:
-        #             mat_r[j, svc] = 1
-        #
-        #         # (B) 权重删除策略（根据 score）
-        #         score_dict = {}
-        #         for svc in merged_set:
-        #             cw = cost_weight.get(svc, 0)
-        #             rw = request_weight.get(svc, 0)
-        #             score = alpha * cw + beta * rw
-        #             score_dict[svc] = score
-        #         sorted_services = sorted(score_dict.items(), key=lambda x: -x[1])
-        #         weight_selected = [svc for svc, _ in sorted_services[:cap]]
-        #         mat_w = np.zeros((k, num_svc), dtype=int)
-        #         for svc in weight_selected:
-        #             mat_w[j, svc] = 1
-        #
-        #         # # === 替换 base_mat[j] 选择更优方案 ===
-        #         # cost_r, delay_r = compute_objectives(mat_r, problem.servers_pos, problem.user_positions,
-        #         #                                      problem.user_services, problem.assigned_server)
-        #         # cost_w, delay_w = compute_objectives(mat_w, problem.servers_pos, problem.user_positions,
-        #         #                                      problem.user_services, problem.assigned_server)
-        #         # #加黄的和绿的的做法,看看结果
-        #         #
-        #         # score_r = 0.5 * cost_r + 0.5 * delay_r
-        #         # score_w = 0.5 * cost_w + 0.5 * delay_w
-        #         #
-        #         # print(f"\n🔍 Server {j} 比较两种策略：")
-        #         # print(f"  随机删除策略服务列表: {sorted(random_selected)}")
-        #         # print(f"  权重删除策略服务列表: {sorted(weight_selected)}")
-        #         # print(f"  随机策略 -> Cost: {cost_r:.2f}, Delay: {delay_r:.2f}, Score: {score_r:.2f}")
-        #         # print(f"  权重策略 -> Cost: {cost_w:.2f}, Delay: {delay_w:.2f}, Score: {score_w:.2f}")
-        #         # print(f"  ✅ 选择策略: {'权重策略' if score_w < score_r else '随机策略'}")
-        #         #
-        #         # base_mat[j] = mat_w[j] if score_w < score_r else mat_r[j]
-        #         # === 替换 base_mat[j] 选择更优方案（归一化 + 加权） ===
-        #         cost_r, delay_r = compute_objectives(mat_r, problem.servers_pos, problem.user_positions,
-        #                                              problem.user_services, problem.assigned_server)
-        #         cost_w, delay_w = compute_objectives(mat_w, problem.servers_pos, problem.user_positions,
-        #                                              problem.user_services, problem.assigned_server)
-        #
-        #         # 最小-最大归一化（避免相差数量级造成偏差）
-        #         cost_min = min(cost_r, cost_w)
-        #         cost_max = max(cost_r, cost_w)
-        #         delay_min = min(delay_r, delay_w)
-        #         delay_max = max(delay_r, delay_w)
-        #
-        #         # 避免除以 0
-        #         def norm(v, vmin, vmax):
-        #             return (v - vmin) / (vmax - vmin + 1e-6)
-        #
-        #         norm_cost_r = norm(cost_r, cost_min, cost_max)
-        #         norm_delay_r = norm(delay_r, delay_min, delay_max)
-        #         norm_cost_w = norm(cost_w, cost_min, cost_max)
-        #         norm_delay_w = norm(delay_w, delay_min, delay_max)
-        #
-        #         score_r = alpha * norm_cost_r + beta * norm_delay_r
-        #         score_w = alpha * norm_cost_w + beta * norm_delay_w
-        #
-        #         print(f"\n🔍 Server {j} 比较两种策略（归一化后加权）:")
-        #         print(f"  随机策略 -> RawCost: {cost_r:.2f}, RawDelay: {delay_r:.2f}, Score: {score_r:.4f}")
-        #         print(f"  权重策略 -> RawCost: {cost_w:.2f}, RawDelay: {delay_w:.2f}, Score: {score_w:.4f}")
-        #         print(f"  ✅ 选择策略: {'权重策略' if score_w < score_r else '随机策略'}")
-        #
-        #         base_mat[j] = mat_w[j] if score_w < score_r else mat_r[j]
-        #
-        #         # print("每行")
-        #         # print(base_mat[j])
-        #
-        #         # # ✅ 选择更优策略
-        #         # if score_w < score_r:
-        #         #     base_mat[j] = mat_w[j]
-        #         #     anchor = weight_selected[0]
-        #         #     print(f"✅ Server {j} → 采用权重策略，Anchor: {anchor}")
-        #         # else:
-        #         #     base_mat[j] = mat_r[j]
-        #         #     anchor = random_selected[0]
-        #         #     print(f"✅ Server {j} → 采用随机策略，Anchor: {anchor}")
-        #         # #
-        #         # anchor_services.append(anchor)
-        #     # print("最终")
-        #     # print(base_mat)
-        #     return expand_population_new(base_mat)
         elif self.mode == "hybrid":
             cost_mat, _, _, _ = greedy_service_deployment_by_cost(
                 problem.servers_pos, problem.user_positions,
@@ -916,7 +570,7 @@ class ServiceSampling(Sampling):
                 problem.user_services, problem.assigned_server
             )
 
-            from service_selection_strategies import compute_objectives
+            from LocalSearch.service_selection_strategies import compute_objectives
 
             alpha = 0.5
             beta = 0.5
@@ -1070,163 +724,152 @@ class ServiceSampling(Sampling):
                 for svc in selected_services:
                     base_mat[j, svc] = 1
 
-            # base_mat = np.zeros((k, num_svc), dtype=int)
-            # for j in range(k):
-            #     cost_order = sorted(
-            #         [idx for idx, val in enumerate(cost_mat[j]) if val == 1],
-            #         key=lambda x: SERVICE_DEPLOY_COSTS[x]
-            #     )
-            #     freq = {svc: 0 for svc in range(num_svc)}
-            #     user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
-            #     for u in user_indices:
-            #         freq[problem.user_services[u]] += 1
-            #     request_order = sorted(
-            #         [idx for idx, val in enumerate(req_mat[j]) if val == 1],
-            #         key=lambda x: -freq[x]
-            #     )
-            #     merged = []
-            #     seen = set()
-            #     for idx in cost_order + request_order:
-            #         if idx not in seen:
-            #             merged.append(idx)
-            #             seen.add(idx)
-            #     # print(merged)
-            #
-            #     if len(merged) > cap:
-            #         drop_count = len(merged) - cap
-            #         drop_items = random.sample(merged, drop_count)  # 不重复随机选
-            #         for d in drop_items:
-            #             merged.remove(d)
-            #     # while len(merged) > cap:
-            #     #     # candidates = merged[-2:] if len(merged) >= 2 else merged[-1:]
-            #     #     # print(candidates)
-            #     #     drop = random.choice()
-            #     #     merged.remove(drop)
-            #     for idx in merged:
-            #         base_mat[j, idx] = 1
+
             return expand_population_new(base_mat)
             # return expand_population(base_mat)
 
+
         elif self.mode == "hybrid-A-1":
+
+            # ... (这部分代码保持不变，获取 cost_mat 和 req_mat) ...
+
             cost_mat, _, _, _ = greedy_service_deployment_by_cost(
+
                 problem.servers_pos, problem.user_positions,
+
                 problem.user_services, problem.assigned_server
+
             )
+
             req_mat, _, _, _ = greedy_service_deployment_by_request(
+
                 problem.servers_pos, problem.user_positions,
+
                 problem.user_services, problem.assigned_server
+
             )
-            #1.随机在Merge之后的数组里drop掉超容量的
-            #2.按照权重做法去drop掉超出容量限制的数量
-            alpha = 0.5  # 成本占比
-            beta = 0.5  # 请求频率占比
+
+            alpha = 0.5;
+            beta = 0.5
 
             base_mat = np.zeros((k, num_svc), dtype=int)
+
             for j in range(k):
 
-                # 获取 cost_order
-                cost_order = sorted(
-                    [idx for idx, val in enumerate(cost_mat[j]) if val == 1],
-                    key=lambda x: SERVICE_DEPLOY_COSTS[x]
-                )
-                cost_weight = {}
-                for rank, svc in enumerate(cost_order):
-                    cost_weight[svc] = max(SERVICE_CAPACITY_PER_SERVER - rank, 1)
+                # --- 1. 计算权重 (保持不变) ---
 
-                # 获取 request_order
+                cost_order = sorted([idx for idx, val in enumerate(cost_mat[j]) if val == 1],
+
+                                    key=lambda x: SERVICE_DEPLOY_COSTS[x])
+
+                cost_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in enumerate(cost_order)}
+
                 freq = {svc: 0 for svc in range(num_svc)}
-                user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
-                for u in user_indices:
-                    freq[problem.user_services[u]] += 1
-                request_order = sorted(
-                    [idx for idx, val in enumerate(req_mat[j]) if val == 1],
-                    key=lambda x: -freq[x]
-                )
-                request_weight = {}
-                for rank, svc in enumerate(request_order):
-                    request_weight[svc] = max(SERVICE_CAPACITY_PER_SERVER - rank, 1)
 
-                # 合并并打分
+                user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
+
+                for u in user_indices: freq[problem.user_services[u]] += 1
+
+                request_order = sorted([idx for idx, val in enumerate(req_mat[j]) if val == 1],
+
+                                       key=lambda x: -freq[x])
+
+                request_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in
+                                  enumerate(request_order)}
+
+                # --- 2. 详细数据收集 (修改部分) ---
+
                 merged_set = set(cost_order) | set(request_order)
-                score_dict = {}
+
+                # 临时列表，用于后续排序和绘图
+
+                candidates_list = []
+
                 for svc in merged_set:
                     cw = cost_weight.get(svc, 0)
-                    rw = request_weight.get(svc, 0)
-                    score = alpha * cw + beta * rw
-                    score_dict[svc] = score
 
-                cap = SERVICE_CAPACITY_PER_SERVER  # 假设 cap = 4
+                    rw = request_weight.get(svc, 0)
+
+                    cost_part = alpha * cw
+
+                    req_part = beta * rw
+
+                    total_score = cost_part + req_part
+
+                    candidates_list.append({
+
+                        'id': svc,
+
+                        'cost_part': cost_part,
+
+                        'req_part': req_part,
+
+                        'total': total_score,
+
+                        'status': 'Discarded'  # 默认状态
+
+                    })
+
+                # --- 3. 选择逻辑 ---
+
+                cap = SERVICE_CAPACITY_PER_SERVER
+
                 keep_top_n = 2
+
                 random_pick_n = cap - keep_top_n
 
-                # 排序并获取前 keep_top_n 个高分服务
-                sorted_services = sorted(score_dict.items(), key=lambda x: -x[1])
-                top_services = [svc for svc, _ in sorted_services[:keep_top_n]]
+                # 按总分排序
 
-                # 从剩下的服务中随机选择 random_pick_n 个
-                remaining_candidates = [svc for svc, _ in sorted_services[keep_top_n:]]
-                if len(remaining_candidates) >= random_pick_n:
-                    random_selected = random.sample(remaining_candidates, random_pick_n)
+                candidates_list.sort(key=lambda x: x['total'], reverse=True)
+
+                # 选 Top-N
+
+                top_n_candidates = candidates_list[:keep_top_n]
+
+                for c in top_n_candidates:
+                    c['status'] = 'Top-N'
+
+                # 选 Random
+
+                remaining = candidates_list[keep_top_n:]
+
+                if len(remaining) >= random_pick_n:
+
+                    random_candidates = random.sample(remaining, random_pick_n)
+
                 else:
-                    # 如果剩余不足，就尽可能多选
-                    random_selected = remaining_candidates
 
-                selected_services = top_services + random_selected
+                    random_candidates = remaining
 
-                # 写入部署矩阵
-                for svc in selected_services:
+                for c in random_candidates:
+                    c['status'] = 'Random'
+
+                # 最终选中列表
+
+                selected_ids = [c['id'] for c in top_n_candidates + random_candidates]
+
+                # 写入 base_mat
+
+                for svc in selected_ids:
                     base_mat[j, svc] = 1
 
-                # # 最终选择前 cap-1 个分数最高的服务
-                # sorted_services = sorted(score_dict.items(), key=lambda x: -x[1])
-                # top_services = [svc for svc, _ in sorted_services[:SERVICE_CAPACITY_PER_SERVER - 1]]
-                #
-                # # 从剩余中随机补一个服务
-                # remaining_candidates = [svc for svc, _ in sorted_services[SERVICE_CAPACITY_PER_SERVER - 1:]]
-                # if remaining_candidates:
-                #     random_svc = random.choice(remaining_candidates)
-                #     selected_services = top_services + [random_svc]
-                # else:
-                #     selected_services = top_services  # 若不足 cap，直接用已有的
-                #
-                # # 更新 base_mat
-                # for svc in selected_services:
-                #     base_mat[j, svc] = 1
+                # ==========================================
 
-            # base_mat = np.zeros((k, num_svc), dtype=int)
-            # for j in range(k):
-            #     cost_order = sorted(
-            #         [idx for idx, val in enumerate(cost_mat[j]) if val == 1],
-            #         key=lambda x: SERVICE_DEPLOY_COSTS[x]
-            #     )
-            #     freq = {svc: 0 for svc in range(num_svc)}
-            #     user_indices = [u for u, srv in enumerate(problem.assigned_server) if srv == j]
-            #     for u in user_indices:
-            #         freq[problem.user_services[u]] += 1
-            #     request_order = sorted(
-            #         [idx for idx, val in enumerate(req_mat[j]) if val == 1],
-            #         key=lambda x: -freq[x]
-            #     )
-            #     merged = []
-            #     seen = set()
-            #     for idx in cost_order + request_order:
-            #         if idx not in seen:
-            #             merged.append(idx)
-            #             seen.add(idx)
-            #     # print(merged)
-            #
-            #     if len(merged) > cap:
-            #         drop_count = len(merged) - cap
-            #         drop_items = random.sample(merged, drop_count)  # 不重复随机选
-            #         for d in drop_items:
-            #             merged.remove(d)
-            #     # while len(merged) > cap:
-            #     #     # candidates = merged[-2:] if len(merged) >= 2 else merged[-1:]
-            #     #     # print(candidates)
-            #     #     drop = random.choice()
-            #     #     merged.remove(drop)
-            #     for idx in merged:
-            #         base_mat[j, idx] = 1
+                # 🔥 [新钩子] 详细可视化：Server 0
+
+                # ==========================================
+
+                if j == 2:
+                    print(f"\n📊 正在生成 Server {j} 的详细流程图...")
+
+                    visualize_detailed_hybrid_process(j, candidates_list)
+
+                # ==========================================
+
+            return expand_population_new(base_mat)
+
+
+
             return expand_population_new(base_mat)
 
         elif self.mode == "hybrid-B":
@@ -1290,7 +933,7 @@ class ServiceSampling(Sampling):
                 problem.user_services, problem.assigned_server
             )
 
-            from service_selection_strategies import compute_objectives
+            from LocalSearch.service_selection_strategies import compute_objectives
 
             alpha = 0.5
             beta = 0.5
@@ -1399,7 +1042,7 @@ class ServiceSampling(Sampling):
         #         problem.user_services, problem.assigned_server
         #     )
         #
-        #     from service_selection_strategies import compute_objectives
+        #     from LocalSearch.service_selection_strategies import compute_objectives
         #
         #     alpha = 0.5  # cost占比
         #     beta = 0.5  # request占比
@@ -1662,7 +1305,7 @@ def analyze_nsga_result(result, k, num_svc=8, a=0.5, b=0.5):
             print(f"  Server {j} => 服务 {deployed_svcs.tolist()}")
 
 
-from service_selection_strategies import (
+from LocalSearch.service_selection_strategies import (
     random_service_deployment,
     greedy_service_deployment_by_cost,
     greedy_service_deployment_by_request
@@ -1716,14 +1359,14 @@ if __name__ == "__main__":
     print("用户首选服务器(assignment):", assignment[:10], "...")
 
     strategies = {
-        "random": "res_random.npz",
-        "greedy_cost": "res_greedy_cost.npz",
-        "greedy_request": "res_greedy_request.npz",
-        "hybrid-A-1": "res_hybrid-A-1.npz",
-        # "hybrid": "res_hybrid.npz",
-        # "hybrid-A": "res_hybrid-A.npz",
-        # "hybrid-B": "res_hybrid-B.npz",
-        # "hybrid-C": "res_hybrid-C.npz"
+        "random": os.path.join(PROJECT_ROOT, "output/npz/res_random.npz"),
+        "greedy_cost": os.path.join(PROJECT_ROOT, "output/npz/res_greedy_cost.npz"),
+        "greedy_request": os.path.join(PROJECT_ROOT, "output/npz/res_greedy_request.npz"),
+        "hybrid-A-1": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-A-1.npz"),
+        # "hybrid": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid.npz"),
+        # "hybrid-A": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-A.npz"),
+        # "hybrid-B": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-B.npz"),
+        # "hybrid-C": os.path.join(PROJECT_ROOT, "output/npz/res_hybrid-C.npz"),
     }
 
     for mode, filename in strategies.items():
@@ -1756,65 +1399,5 @@ if __name__ == "__main__":
         np.savez(filename, X=res.X, F=res.F)
         print(f"✅ 已保存：{filename}")
 
-    # ========== 2) 在 NSGA-II 中只优化服务部署  ========== #
-    # res = run_nsga_service_deploy(
-    #     servers_pos=selected_positions,  # shape(k,2)
-    #     user_positions=user_positions,
-    #     user_services=user_services,
-    #     assigned_server=assignment,
-    #     k=len(best_sol),
-    #     pop_size=30,
-    #     n_gen=100,
-    #     seed=42,
-    # )
-    # 运行方案 A：纯随机初始化
-    # res_random = run_nsga_service_deploy(
-    #     servers_pos=selected_positions,
-    #     user_positions=user_positions,
-    #     user_services=user_services,
-    #     assigned_server=assignment,
-    #     k=len(best_sol),
-    #     pop_size=30,
-    #     n_gen=200,
-    #     seed=42
-    # )
-    # np.savez("res_random.npz", X=res_random.X, F=res_random.F)
 
-    # 修改 sampling 类为混合策略后，再运行方案 B
-    # 你只需要手动取消注释混合策略的 ServiceSampling 即可
-    # res_hybrid = run_nsga_service_deploy(
-    #     servers_pos=selected_positions,
-    #     user_positions=user_positions,
-    #     user_services=user_services,
-    #     assigned_server=assignment,
-    #     k=len(best_sol),
-    #     pop_size=30,
-    #     n_gen=200,
-    #     seed=42
-    # )
-    # np.savez("res_hybrid.npz", X=res_hybrid.X, F=res_hybrid.F)
-
-    # ========== 3) 分析/输出结果 ========== #
-    # analyze_nsga_result(res_hybrid, k=len(best_sol), num_svc=8)
-    #
-    # # 2) 分别使用三种对比策略
-    # dep_rand, cost_rand, delay_rand, weighted_rand = random_service_deployment(selected_positions, user_positions,
-    #                                                                            user_services, assignment)
-    # print("\n随机部署策略：")
-    # print("部署矩阵：\n", dep_rand)
-    # print("Cost = {:.2f}, Delay = {:.2f}, Weighted = {:.2f}".format(cost_rand, delay_rand, weighted_rand))
-    #
-    # dep_cost, cost_cost, delay_cost, weighted_cost = greedy_service_deployment_by_cost(selected_positions,
-    #                                                                                    user_positions, user_services,
-    #                                                                                    assignment)
-    # print("\n基于成本贪心部署策略：")
-    # print("部署矩阵：\n", dep_cost)
-    # print("Cost = {:.2f}, Delay = {:.2f}, Weighted = {:.2f}".format(cost_cost, delay_cost, weighted_cost))
-    #
-    # dep_req, cost_req, delay_req, weighted_req = greedy_service_deployment_by_request(selected_positions,
-    #                                                                                   user_positions, user_services,
-    #                                                                                   assignment)
-    # print("\n基于请求贪心部署策略：")
-    # print("部署矩阵：\n", dep_req)
-    # print("Cost = {:.2f}, Delay = {:.2f}, Weighted = {:.2f}".format(cost_req, delay_req, weighted_req))
 
