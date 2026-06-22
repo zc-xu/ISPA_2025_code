@@ -1,0 +1,8 @@
+Config,DataFile,TargetServers,Users,Candidates,ServiceTypes,SigmaMin,N2Adjust,Series
+10_100,data/input_data_10_100_8.xlsx,10,100,20,8,12,0,fixed_servers
+10_130,data/input_data_10_130_8_new.xlsx,10,130,20,8,16,-1,fixed_servers_and_fixed_users
+10_150,data/input_data_10_150_8_new.xlsx,10,150,20,8,18,-1,fixed_servers
+10_180,data/input_data_10_180_8_new.xlsx,10,180,20,8,22,0,fixed_servers
+5_130,data/input_data_5_130_8_new.xlsx,5,130,10,8,15,-1,fixed_users
+15_130,data/input_data_15_130_8_new.xlsx,15,130,30,8,17,0,fixed_users
+20_130,data/input_data_20_130_8_new.xlsx,20,130,40,8,18,0,fixed_users
