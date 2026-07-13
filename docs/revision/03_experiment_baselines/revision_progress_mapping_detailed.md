@@ -1,19 +1,21 @@
 # MOS2 Revision Progress Mapping
 
-本文档用于向导师汇报当前返修进展，并把审稿意见与当前保留的代码修改逐条对应起来。当前版本保留可复现性、批量实验入口、Pareto 指标、CLS 初始化敏感性、混合锚点参数化、地理泛化和小规模联合优化对比；额外 baseline 暂不进入主实验流程。
+本文档用于向导师汇报当前返修进展，并把审稿意见与当前保留的代码修改逐条对应起来。当前版本保留可复现性、批量实验入口、Pareto 指标、CLS 初始化敏感性、混合锚点参数化、地理泛化、小规模联合优化对比，以及 Stage II 的 DQN 学习型基线。
 
 ## 0. 当前结论
 
-1. 当前代码中只保留原有 Stage II 对比方法：`NS-P`、`GCP`、`GDP`、`PSP`。
-2. 额外 baseline 先不放入主动实验流程，避免在结果不稳定或解释不足时影响论文主线。
+1. 当前 Stage II 对比方法为：`NS-P`、`GCP`、`GDP`、`PSP`、`DQN`。
+2. DQN 作为学习型 baseline 纳入可复现实验，但只以独立偏好点、指标表和控制变量柱状图展示，不把五个点连接成连续 Pareto curve。
 3. 已保留数据集配置表、批量运行入口、Pareto 指标计算和统一风格图表生成，方便后续切换不同规模数据集复现实验。
 4. 主展示指标建议保留 `HV`、`IGD`、`Best Q`；`Spacing` 仅保留在 CSV 中作为可追溯指标，不作为主图指标。
+
+> 2026-07-14 更新：本文件后文若仍出现“DQN 未纳入”的旧状态描述，以本节和 `dqn_stage2_baseline_report.md` 为准。SPEA2 仍不纳入，因为它不是 learning-based service placement 方法。
 
 ## 1. 审稿意见与当前修改结果总表
 
 | 审稿意见 | 审稿人真正关心的问题 | 当前保留修改 | 支撑文件/结果 | 下一步建议 |
 |---|---|---|---|---|
-| Stage II 对比实验不够充分。 | 审稿人希望看到更强、更可解释的对比和定量评价。 | 当前先保留原有四类方法，并新增批量入口和 Pareto 指标，保证已有实验可复现、可扩展。 | `LocalSearch/batch_service_experiments.py`；`LocalSearch/pareto_batch_metrics.py`；`output/csv/pareto_metrics_10_130.csv`。 | learning-based baseline 暂缓，等确定建模方式后再单独加入。 |
+| Stage II 对比实验不够充分。 | 审稿人希望看到 learning-based service placement baseline 和定量评价。 | 已加入可复现 DQN，完成七组控制变量实验；五个偏好结果作为独立点和柱状图展示，不连接成连续 Pareto curve。 | `LocalSearch/dqn_service_baseline.py`；`LocalSearch/plot_dqn_control_results.py`；`docs/revision/03_experiment_baselines/dqn_stage2_baseline_report.md`。 | 正文补充 DQN 建模、训练预算和结果边界；SPEA2 不纳入。 |
 | CLS 初始化敏感性解释不足。 | Algorithm 1 的初始部署集合 `S` 随机生成，审稿人担心不同初值导致不同局部最优。 | 已新增 CLS 初始化敏感性实验，对比 random、density、distance-sum、greedy、density-diverse 五类初值。主图改为固定 130 用户规模 heatmap；另提供 `10_150` Random vs Greedy 辅助图。 | `LocalSearch/cls_initialization_sensitivity.py`；`output/pdf/cls_init_sensitivity_130_heatmap.pdf`；`output/pdf/cls_init_random_vs_greedy_10_150.pdf`；`output/csv/cls_init_sensitivity_all_data_scan.csv`。 | 正文主结论写 CLS 对初始化整体不敏感；辅助结论写单纯 Greedy 不一定更好。不要写 Random 普遍优于所有初始化。 |
 | 缺少 Pareto front 定量指标。 | 原稿主要依赖散点图和加权 Q，缺少通用指标。 | 已新增 `HV`、`IGD`、`Best Q`，并生成 CSV、Excel、PDF、PNG。 | `LocalSearch/pareto_batch_metrics.py`；`output/pdf/pareto_metrics_10_130.pdf`。 | 正文说明指标方向：`HV` 越高越好；`IGD`、`Best Q` 越低越好。 |
 | 多规模实验数据对应关系不清楚。 | 代码仓库里 Excel 较多，难以判断哪个文件对应哪组论文实验。 | 已新增显式配置清单，列出 7 组候选实验配置、用户规模、服务器规模、`sigma_min` 和 `n2_adjust`。 | `LocalSearch/experiment_configs.py`；`output/csv/experiment_config_manifest.csv`。 | 后续如需完整复现实验，可直接用 `--configs all` 或指定配置名。 |
@@ -38,6 +40,8 @@
 | `LocalSearch/real_region_generalization.py` | 从真实北京基站池筛选不同区域并运行 Stage I。 |
 | `LocalSearch/run_real_region_stage2.py` | 对保存的真实区域候选运行 Stage II。 |
 | `LocalSearch/joint_optimality_gap.py` | 小规模 Joint-Exact 与 MOS2-PSP 对比。 |
+| `LocalSearch/dqn_service_baseline.py` | 可复现 DQN 学习型服务放置 baseline。 |
+| `LocalSearch/plot_dqn_control_results.py` | 生成 paper-aligned 与 full-rerun 两套 DQN 控制变量图。 |
 
 ## 3. 当前可用命令
 
@@ -104,7 +108,7 @@
 
 可以这样汇报：
 
-> 我们先撤掉了临时额外 baseline，只保留原有 Stage II 对比方法和可复现性增强。现在代码已经整理出统一实验配置、批量运行入口、Pareto 指标统计脚本和 CLS 初始化敏感性实验。对于审稿人质疑 CLS 随机初始化敏感的问题，我们比较了 random、density、distance-sum、greedy 和 density-diverse 五类初值；结果显示多数数据集最终收敛到同一成本，random 在 10/130、10/150、10/180 中平均 gap 分别约为 2.10%、1.27%、2.40%，说明 CLS 对初始化整体较稳。同时，10/150 中单纯边际贪心差 15.88%，说明贪心初始化不一定更好，可能陷入较差局部最优。所有新增 PDF 图已渲染检查，未发现坐标轴、图例或标签裁切。
+> 当前代码保留统一实验配置、批量运行入口、Pareto 指标统计、CLS 初始化敏感性和 DQN 学习型 baseline。DQN 在七组控制变量配置下均按五个偏好权重训练；10/130 中 PSP 的 HV/IGD/BestQ 为 0.9582/0.0016/0.3185，DQN 为 0.3382/0.4048/0.5974，表明标准标量化 DQN 在声明预算下弱于 PSP。图中 DQN 只显示独立点或柱，不连接成连续 Pareto 曲线。CLS 初始化实验则显示多数数据集最终结果接近，同时单纯贪心在 10/150 中可能陷入较差局部最优。
 
 ## 6. 后续待办
 
@@ -113,4 +117,4 @@
 3. 将 10/130 Pareto 指标和 CLS 初始化敏感性结果写入实验分析。
 4. 保留比例式 `varpi_j` 解释，但不声称半容量是实验最优。
 5. 拿到 Visio 源文件后修改 Fig. 1/Fig. 2，并统一原稿图字号。
-6. 如导师要求 learning-based baseline，重新设计多目标学习方法，不恢复旧 DQN/SPEA2。
+6. 将已完成的 DQN 建模、训练预算和结果写入正文及 response；SPEA2 不纳入，后续仅在需要完整学习型 Pareto set 时再考虑 preference-conditioned MORL。

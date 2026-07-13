@@ -21,6 +21,7 @@ METHOD_FILES = OrderedDict(
         ("GCP", "res_greedy_cost.npz"),
         ("GDP", "res_greedy_request.npz"),
         ("PSP", "res_hybrid-A-1.npz"),
+        ("DQN", "res_dqn.npz"),
     ]
 )
 
@@ -29,6 +30,7 @@ METHOD_COLORS = {
     "GCP": "#2ca02c",
     "GDP": "#ff7f0e",
     "PSP": "#d62728",
+    "DQN": "#9467bd",
 }
 
 METHOD_MARKERS = {
@@ -36,6 +38,7 @@ METHOD_MARKERS = {
     "GCP": "s",
     "GDP": "^",
     "PSP": "D",
+    "DQN": "P",
 }
 
 

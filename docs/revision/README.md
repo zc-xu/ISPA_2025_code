@@ -4,12 +4,14 @@ This directory collects the manuscript revision notes, reviewer-response plannin
 
 ## Start Here
 
-Read `HANDOFF_2026-07-13.md` first. It records the current GitHub handoff status, reviewer-comment mapping, implemented code changes, validated results, reproducibility commands, and remaining tasks since the previous push.
+Read `HANDOFF_2026-07-14.md` first. It records the current GitHub handoff status, reviewer-comment mapping, implemented code changes, validated results, reproducibility commands, and remaining tasks since the previous push.
 
 ## Directory Layout
 
+- `HANDOFF_2026-07-14.md`
+  - Current handoff note, including the restored DQN baseline and its verified results.
 - `HANDOFF_2026-07-13.md`
-  - Current handoff note for continuing the revision on another computer.
+  - Previous handoff before the DQN baseline was restored.
 - `HANDOFF_2026-06-22.md`
   - Previous handoff at commit `b4dd6d5`.
 - `01_review_comments/`
@@ -35,7 +37,7 @@ The current code keeps the reproducibility improvements:
 - capacity-aware hybrid-anchor sensitivity in `LocalSearch/hybrid_anchor_sensitivity.py`;
 - small-scale joint exact comparison in `LocalSearch/joint_optimality_gap.py`.
 
-DQN-related runnable code and generated DQN artifacts have been removed from the active experiment code for now. Extra baseline candidates are kept only as revision notes in `03_experiment_baselines/`; they are not part of the active experiment pipeline.
+DQN is included as the Stage-II learning-based baseline. It is evaluated as five preference-weighted solution points and is never connected into a misleading continuous Pareto curve. SPEA2 remains excluded because it is not a learning-based method and does not address the reviewer request.
 
 ## Common Commands
 
@@ -43,6 +45,13 @@ Run metrics for the reproduced `10_130` case:
 
 ```powershell
 .\LocalSearch\Scripts\python.exe .\LocalSearch\pareto_batch_metrics.py --config 10_130
+```
+
+Run the reproducible DQN baseline for all seven controlled configurations:
+
+```powershell
+.\LocalSearch\Scripts\python.exe .\LocalSearch\dqn_service_baseline.py --configs all --weights 0.1 0.3 0.5 0.7 0.9 --episodes 320 --dqn-seeds 42
+.\LocalSearch\Scripts\python.exe .\LocalSearch\plot_dqn_control_results.py
 ```
 
 Run the batch entrypoint for one configuration, keeping the NSGA-II initialization baselines:

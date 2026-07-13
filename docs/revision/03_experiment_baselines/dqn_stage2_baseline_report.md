@@ -1,0 +1,107 @@
+# Stage II DQN Baseline: Implementation and Verified Results
+
+## 1. Purpose
+
+This experiment addresses the reviewer comment that the Stage II baselines include GCP, GDP, and standard NSGA-II initialization but do not include a recent learning-based service-placement method such as deep reinforcement learning or a graph neural network.
+
+DQN is retained as a transparent learning-based baseline. It is not presented as a native multi-objective optimizer and its five preference-weighted outputs are not connected into a continuous Pareto curve.
+
+## 2. Mapping DQN to the Service-Placement Problem
+
+For a configuration with `K` selected edge servers and eight service types, the DQN constructs a binary deployment matrix of size `K x 8`.
+
+| Element | Definition in this experiment |
+|---|---|
+| State | Current server index, service-slot index, selected services on the current server, local request distribution, normalized deployment costs, global request distribution, and preference weight `lambda` |
+| Action | Select one of eight service types or skip the current slot |
+| Transition | Move to the next service slot and then to the next server |
+| Capacity | At most four decisions per server, consistent with `SERVICE_CAPACITY_PER_SERVER=4` |
+| Reward | A small request-coverage/cost shaping reward plus a terminal reward based on the normalized cost-delay weighted objective |
+| Output | A binary service-deployment matrix evaluated by the original `MyServiceDeployProblem._calc_obj()` function |
+
+The scalarized terminal objective is
+
+```text
+Q_lambda = lambda * normalized_cost + (1 - lambda) * normalized_delay.
+```
+
+Five weights are used: `0.1, 0.3, 0.5, 0.7, 0.9`. Each weight trains a separate policy for 320 episodes with seed 42. The implementation uses a NumPy multilayer Q-network, replay buffer, target network, epsilon-greedy exploration, and deterministic random seeds; it does not require PyTorch.
+
+## 3. Reproducibility
+
+Run all seven controlled configurations:
+
+```powershell
+.\LocalSearch\Scripts\python.exe .\LocalSearch\dqn_service_baseline.py --configs all --weights 0.1 0.3 0.5 0.7 0.9 --episodes 320 --dqn-seeds 42
+```
+
+Regenerate metric tables and figures:
+
+```powershell
+$configs='10_100','10_130','10_150','10_180','5_130','15_130','20_130'
+foreach($config in $configs) {
+    .\LocalSearch\Scripts\python.exe .\LocalSearch\pareto_batch_metrics.py --config $config
+}
+.\LocalSearch\Scripts\python.exe .\LocalSearch\plot_dqn_control_results.py
+```
+
+Primary outputs:
+
+- `output/npz/res_dqn_<config>.npz`: deployment matrices and objective values.
+- `output/csv/dqn_summary_<config>.csv`: best feasible deployment encountered for every preference weight.
+- `output/csv/dqn_training_<config>.csv`: episode-level training audit trail.
+- `output/csv/pareto_metrics_<config>.csv`: five-method HV, IGD, Spacing, and BestQ.
+- `output/csv/dqn_control_bestq_paper_aligned.csv`: DQN evaluated with the original four-method normalization bounds.
+- `output/csv/dqn_control_bestq_full_rerun.csv`: all five methods jointly normalized.
+- `output/png/dqn_fixed_servers_paper_aligned.png` and `dqn_fixed_users_paper_aligned.png`: controlled-variable comparisons.
+
+## 4. Verified Results
+
+The following table uses five-method joint normalization. Higher HV is better; lower IGD and BestQ are better.
+
+| Config | PSP HV | DQN HV | PSP IGD | DQN IGD | PSP BestQ | DQN BestQ |
+|---|---:|---:|---:|---:|---:|---:|
+| 10_100 | 0.9780 | 0.4130 | 0.0330 | 0.3783 | 0.2629 | 0.5592 |
+| 10_130 | 0.9582 | 0.3382 | 0.0016 | 0.4048 | 0.3185 | 0.5974 |
+| 10_150 | 1.0145 | 0.4869 | 0.0161 | 0.3204 | 0.2677 | 0.4972 |
+| 10_180 | 1.0129 | 0.4373 | 0.0159 | 0.3624 | 0.2574 | 0.4588 |
+| 5_130 | 1.0518 | 0.4596 | 0.0297 | 0.3774 | 0.2257 | 0.4751 |
+| 15_130 | 0.9909 | 0.3053 | 0.0230 | 0.4981 | 0.2819 | 0.5801 |
+| 20_130 | 1.0343 | 0.2634 | 0.0100 | 0.5860 | 0.2488 | 0.5713 |
+
+For the representative 10/130 case, DQN produced five solutions, four of which were non-dominated within the DQN set. PSP produced 50 non-dominated solutions and was substantially better on HV, IGD, and BestQ.
+
+The result supports a limited conclusion: under the declared training budget, a standard scalarized DQN is less effective than PSP+NSGA-II for generating a high-quality cost-delay solution set in this static combinatorial placement problem. It does not prove that every DRL architecture is inferior, and the different output-set sizes must be stated when interpreting HV and IGD.
+
+## 5. Historical Snapshot and Current Authoritative Run
+
+An earlier local run recorded the following 10/130 values:
+
+| Method | HV | IGD | Spacing | BestQ |
+|---|---:|---:|---:|---:|
+| PSP | 0.9976 | 0.0013 | 0.0095 | 0.2985 |
+| DQN | 0.4765 | 0.3273 | 0.1542 | 0.5311 |
+
+The source file and exact result arrays for that run had been removed before the current restoration, so those values are retained only as a historical audit snapshot. The tables and artifacts committed with this report are generated by the restored implementation and are the reproducible authoritative results.
+
+## 6. Figure and Spreadsheet Validation
+
+- DQN is shown with purple markers or bars.
+- The Pareto scatter contains five independent DQN points and no connecting line.
+- Both controlled-variable figures contain five methods across four configurations.
+- The Excel workbook contains four native charts on each of `Sheet1` and `Sheet1 (2)`; every chart source contains five category/value points.
+- The workbook formula-error scan found zero `#REF!`, `#DIV/0!`, `#VALUE!`, `#NAME?`, or `#N/A` cells.
+
+## 7. Response-Letter Draft
+
+### English
+
+Thank you for pointing out the absence of a learning-based service-placement baseline. We have added a DQN-based baseline to the Stage II evaluation. The service-placement matrix is constructed sequentially: the state contains the current server and service slot, the services already selected on the current server, local and global request distributions, service deployment costs, and a cost-delay preference weight; each action selects a service type or skips the current slot. The terminal deployment matrix is evaluated using exactly the same cost and delay functions as the other methods. We trained separate scalarized policies for five preference weights under a fixed training budget and report their independent solution points without connecting them into a continuous Pareto curve. In the representative 10-server/130-user case, PSP achieved an HV of 0.9582, an IGD of 0.0016, and a BestQ of 0.3185, whereas DQN achieved 0.3382, 0.4048, and 0.5974, respectively. The controlled-variable experiments show the same overall tendency. These results indicate that, under the reported training budget, the standard scalarized DQN baseline is less effective at constructing a high-quality cost-delay solution set for this static combinatorial placement problem, while the proposed PSP initialization combined with NSGA-II maintains substantially better convergence and coverage.
+
+### 中文解释
+
+感谢审稿人指出缺少学习型服务放置基线。修改后在 Stage II 中加入了 DQN。DQN 逐步生成服务部署矩阵，状态包含当前服务器、当前服务槽、已选服务、本地和全局请求分布、部署成本及成本-时延偏好权重；动作是选择一种服务或跳过当前槽位。最终矩阵与其他方法使用完全相同的 cost 和 delay 函数评价。实验对五个偏好权重分别训练策略，并把结果作为独立点报告，不连接成连续 Pareto 曲线。10/130 代表性实验及两条控制变量实验均表明，在声明的训练预算下，标准标量化 DQN 的解集质量弱于 PSP+NSGA-II，因此该学习型基线既回应了审稿意见，也支持本文方法在静态组合式服务放置问题上的适用性。
+
+## 8. Interpretation Boundary
+
+The formal paper should use the paper-aligned controlled-variable bars or a compact metric table. The full-rerun files should be retained for audit. The manuscript should not claim that five DQN points form a complete Pareto front, and it should not claim universal superiority over all DRL or GNN methods.
