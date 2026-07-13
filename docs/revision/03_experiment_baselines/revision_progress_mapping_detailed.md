@@ -1,6 +1,6 @@
 # MOS2 Revision Progress Mapping
 
-本文档用于向导师汇报当前返修进展，并把审稿意见与当前保留的代码修改逐条对应起来。当前版本只保留可复现性、批量实验入口、Pareto 指标统计和原有 Stage II 初始化策略对比；额外 baseline 暂不进入主实验流程。
+本文档用于向导师汇报当前返修进展，并把审稿意见与当前保留的代码修改逐条对应起来。当前版本保留可复现性、批量实验入口、Pareto 指标、CLS 初始化敏感性、混合锚点参数化、地理泛化和小规模联合优化对比；额外 baseline 暂不进入主实验流程。
 
 ## 0. 当前结论
 
@@ -17,7 +17,9 @@
 | CLS 初始化敏感性解释不足。 | Algorithm 1 的初始部署集合 `S` 随机生成，审稿人担心不同初值导致不同局部最优。 | 已新增 CLS 初始化敏感性实验，对比 random、density、distance-sum、greedy、density-diverse 五类初值。主图改为固定 130 用户规模 heatmap；另提供 `10_150` Random vs Greedy 辅助图。 | `LocalSearch/cls_initialization_sensitivity.py`；`output/pdf/cls_init_sensitivity_130_heatmap.pdf`；`output/pdf/cls_init_random_vs_greedy_10_150.pdf`；`output/csv/cls_init_sensitivity_all_data_scan.csv`。 | 正文主结论写 CLS 对初始化整体不敏感；辅助结论写单纯 Greedy 不一定更好。不要写 Random 普遍优于所有初始化。 |
 | 缺少 Pareto front 定量指标。 | 原稿主要依赖散点图和加权 Q，缺少通用指标。 | 已新增 `HV`、`IGD`、`Best Q`，并生成 CSV、Excel、PDF、PNG。 | `LocalSearch/pareto_batch_metrics.py`；`output/pdf/pareto_metrics_10_130.pdf`。 | 正文说明指标方向：`HV` 越高越好；`IGD`、`Best Q` 越低越好。 |
 | 多规模实验数据对应关系不清楚。 | 代码仓库里 Excel 较多，难以判断哪个文件对应哪组论文实验。 | 已新增显式配置清单，列出 7 组候选实验配置、用户规模、服务器规模、`sigma_min` 和 `n2_adjust`。 | `LocalSearch/experiment_configs.py`；`output/csv/experiment_config_manifest.csv`。 | 后续如需完整复现实验，可直接用 `--configs all` 或指定配置名。 |
-| 两阶段分解合理性不足。 | 审稿人担心先服务器部署、再服务部署会牺牲全局最优性。 | 已在论文文字修改中补充两阶段分解理由：基础设施部署和服务配置属于不同时间尺度，分解能降低搜索空间并提高可解释性。 | `D:\NDM\conference_101719.tex`。 | 如版面允许，可补充运行时间或复杂度说明。 |
+| 两阶段分解合理性不足。 | 审稿人担心先服务器部署、再服务部署会牺牲全局最优性。 | 新增小规模 Joint-Exact 对比。6 candidates/30 users/3 servers/4 services 的三个种子中，Best Q gap 均为 0，平均 HV gap 为 3.87%，联合穷举平均约慢 5.85 倍。 | `LocalSearch/joint_optimality_gap.py`；`output/csv/joint_gap_summary_c6_u30_k3_s4_seeds42_44.csv`。 | 写入正文与 response；明确这是小规模经验差距，不是理论最优性保证。 |
+| `varpi_j` 选择依据不足。 | 确定性 anchor 大小看似任意，缺少与容量 `V_j` 的关系。 | 将 `varpi_j` 和 `V_j` 参数化，并完成 144 次容量敏感性运行。保留 `varpi_j=ceil(0.5V_j)` 作为 exploitation/exploration 的比例式默认折中。 | `LocalSearch/hybrid_anchor_sensitivity.py`；`docs/revision/03_experiment_baselines/hybrid_anchor_sensitivity.md`。 | 不声称半容量稳定最优；实验可放 response 或补充材料。 |
+| 地理和流量泛化不足。 | 原稿只在西直门附近数据上验证。 | 新增三组合成分布和真实北京稀疏区域实例。最终真实候选为 40 candidates/130 users/10 servers，Stage I CLS 优势 62.53%；Stage II 多种子下 PSP 的 HV/IGD 优势稳定。 | `LocalSearch/generalization_experiments.py`；`LocalSearch/real_region_generalization.py`；`LocalSearch/run_real_region_stage2.py`。 | 正文使用真实区域结果；合成结果谨慎放 response/补充材料。 |
 | 变量定义和符号不统一。 | 公式可读性和模型可信度受影响。 | 已统一服务部署、关联和容量相关符号，并补充归一化 cost/delay 和 Q 定义。 | `D:\NDM\conference_101719.tex`。 | 后续编译后检查公式编号、表格和正文引用。 |
 | QoS/reliability 讨论不足。 | 实际 MEC 场景还涉及丢包、中断、链路可用性等可靠性因素。 | 已加入 reliability-aware QoS 讨论，作为模型可扩展约束和未来工作。 | `D:\NDM\conference_101719.tex`。 | 当前不扩展实验，避免返修工作量失控。 |
 | 图示解释不足。 | Fig. 1/Fig. 2 对服务器区域、服务路径和流程机制说明不够。 | 已修改 caption；图本身等待 Visio 源文件后再统一重画。 | `D:\NDM\conference_101719.tex`。 | 拿到 Visio 后简化路径、突出 Stage I/Stage II、保持论文图风格一致。 |
@@ -31,6 +33,11 @@
 | `LocalSearch/batch_service_experiments.py` | 批量运行入口，可按配置名重跑 Stage I + Stage II。 |
 | `LocalSearch/pareto_batch_metrics.py` | 读取结果文件，计算 Pareto 指标，生成 CSV/Excel/PDF/PNG。 |
 | `LocalSearch/cls_initialization_sensitivity.py` | 对比不同 CLS 初始化策略，输出初始化敏感性表格和图。 |
+| `LocalSearch/hybrid_anchor_sensitivity.py` | 测试不同 `V_j`、`varpi_j`、配置和随机种子。 |
+| `LocalSearch/generalization_experiments.py` | 生成并运行三类可复现合成地理分布。 |
+| `LocalSearch/real_region_generalization.py` | 从真实北京基站池筛选不同区域并运行 Stage I。 |
+| `LocalSearch/run_real_region_stage2.py` | 对保存的真实区域候选运行 Stage II。 |
+| `LocalSearch/joint_optimality_gap.py` | 小规模 Joint-Exact 与 MOS2-PSP 对比。 |
 
 ## 3. 当前可用命令
 
@@ -64,6 +71,24 @@
 .\LocalSearch\Scripts\python.exe .\LocalSearch\cls_initialization_sensitivity.py --configs all_new --random-runs 50 --seed 42 --max-iter 200
 ```
 
+运行混合锚点容量敏感性实验：
+
+```powershell
+.\LocalSearch\Scripts\python.exe .\LocalSearch\hybrid_anchor_sensitivity.py --configs 10_130 10_150 10_180 5_130 15_130 20_130 --capacities 4 8 --varpi-values 1 half 3 Vj --seeds 42 43 44 --pop-size 50 --n-gen 200
+```
+
+使用已保存结果汇总合成泛化实验：
+
+```powershell
+.\LocalSearch\Scripts\python.exe .\LocalSearch\generalization_experiments.py --scenarios sparse_suburban uniform_large clustered_hotspot --skip-nsga
+```
+
+运行一个小规模 Joint-Exact 对比：
+
+```powershell
+.\LocalSearch\Scripts\python.exe .\LocalSearch\joint_optimality_gap.py --n-candidates 6 --k 3 --n-users 30 --num-services 4 --capacity 4 --seed 42
+```
+
 ## 4. 当前 10/130 指标结果
 
 | Method | HV ↑ | IGD ↓ | Best Q ↓ |
@@ -83,8 +108,9 @@
 
 ## 6. 后续待办
 
-1. 确认是否完整重跑 7 组配置。
-2. 将 10/130 的 Pareto 指标结果写入论文实验分析。
-3. 将 CLS 初始化敏感性实验作为新增消融/鲁棒性实验写入论文。
-4. 拿到 Visio 源文件后修改 Fig. 1/Fig. 2。
-5. 后续如果需要 learning-based baseline，再单独设计更可解释的多目标学习方法。
+1. 将小规模 Joint-Exact 结果和两阶段合理性讨论写入正文与 response。
+2. 将真实稀疏区域泛化结果写入正文，合成结果作为补充证据。
+3. 将 10/130 Pareto 指标和 CLS 初始化敏感性结果写入实验分析。
+4. 保留比例式 `varpi_j` 解释，但不声称半容量是实验最优。
+5. 拿到 Visio 源文件后修改 Fig. 1/Fig. 2，并统一原稿图字号。
+6. 如导师要求 learning-based baseline，重新设计多目标学习方法，不恢复旧 DQN/SPEA2。

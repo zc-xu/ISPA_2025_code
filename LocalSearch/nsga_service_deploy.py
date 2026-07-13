@@ -78,9 +78,9 @@ def visualize_detailed_hybrid_process(server_id, candidate_data):
     # 绘制堆叠柱状图 (竖向)
     # zorder=3 保证柱子在网格线上方
     p1 = ax1.bar(x_pos, cost_parts, color=color_cost, label=r'Cost Score ($\alpha \cdot W_{cost}$)',
-                 alpha=0.85, width=0.6, zorder=3, edgecolor='black', linewidth=0.5)
+                 alpha=0.85, width=0.45, zorder=3, edgecolor='black', linewidth=0.5)
     p2 = ax1.bar(x_pos, req_parts, bottom=cost_parts, color=color_req, label=r'Request Score ($\beta \cdot W_{req}$)',
-                 alpha=0.85, width=0.6, zorder=3, edgecolor='black', linewidth=0.5)
+                 alpha=0.85, width=0.45, zorder=3, edgecolor='black', linewidth=0.5)
 
     # --- 样式设置 ---
     # X轴
@@ -123,7 +123,7 @@ def visualize_detailed_hybrid_process(server_id, candidate_data):
     ax2.axvspan(boundary_2, len(data) - 0.5, facecolor='#B0B0B0', alpha=0.08, zorder=0)
 
     # --- 3. 绘制柱状图 ---
-    bar_width = 0.6
+    bar_width = 0.45
     for idx_bar in range(len(data)):
         s = statuses[idx_bar]
         if s == 'Discarded':
@@ -358,6 +358,10 @@ class MyServiceDeployProblem(Problem):
 #  (2) Repair: 确保每台服务器 <= 4个服务
 ###############################################################
 class ServiceRepair(Repair):
+    def __init__(self, capacity_per_server=None):
+        super().__init__()
+        self.capacity_per_server = capacity_per_server
+
     def _do(self, problem, X, **kwargs):
         """
         X: shape (pop_size, n_var)
@@ -365,6 +369,7 @@ class ServiceRepair(Repair):
         pop_size, n_var = X.shape
         k = problem.k
         num_svc = problem.num_services
+        cap = SERVICE_CAPACITY_PER_SERVER if self.capacity_per_server is None else int(self.capacity_per_server)
 
         for i in range(pop_size):
             # 强制0/1
@@ -372,7 +377,7 @@ class ServiceRepair(Repair):
 
             mat = X[i].reshape((k, num_svc))
             for j in range(k):
-                while np.sum(mat[j]) > SERVICE_CAPACITY_PER_SERVER:
+                while np.sum(mat[j]) > cap:
                     ones_idx = np.where(mat[j] == 1)[0]
                     drop_col = random.choice(ones_idx)
                     mat[j, drop_col] = 0
@@ -382,15 +387,19 @@ class ServiceRepair(Repair):
 
 
 class ServiceSampling(Sampling):
-    def __init__(self, mode="random"):
+    def __init__(self, mode="random", deterministic_anchor_size=None, visualize_hybrid_process=True, capacity_per_server=None):
         super().__init__()
         self.mode = mode
+        self.deterministic_anchor_size = deterministic_anchor_size
+        self.visualize_hybrid_process = visualize_hybrid_process
+        self.capacity_per_server = capacity_per_server
 
     def _do(self, problem, n_samples, **kwargs):
         k = problem.k
         num_svc = problem.num_services
         n_var = k * num_svc
-        cap = SERVICE_CAPACITY_PER_SERVER
+        cap = SERVICE_CAPACITY_PER_SERVER if self.capacity_per_server is None else int(self.capacity_per_server)
+        cap = max(0, min(cap, num_svc))
         from LocalSearch.service_selection_strategies import (
             greedy_service_deployment_by_cost,
             greedy_service_deployment_by_request
@@ -762,7 +771,7 @@ class ServiceSampling(Sampling):
 
                                     key=lambda x: SERVICE_DEPLOY_COSTS[x])
 
-                cost_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in enumerate(cost_order)}
+                cost_weight = {svc: max(cap - rank, 1) for rank, svc in enumerate(cost_order)}
 
                 freq = {svc: 0 for svc in range(num_svc)}
 
@@ -774,7 +783,7 @@ class ServiceSampling(Sampling):
 
                                        key=lambda x: -freq[x])
 
-                request_weight = {svc: max(SERVICE_CAPACITY_PER_SERVER - rank, 1) for rank, svc in
+                request_weight = {svc: max(cap - rank, 1) for rank, svc in
                                   enumerate(request_order)}
 
                 # --- 2. 详细数据收集 (修改部分) ---
@@ -812,9 +821,8 @@ class ServiceSampling(Sampling):
 
                 # --- 3. 选择逻辑 ---
 
-                cap = SERVICE_CAPACITY_PER_SERVER
-
-                keep_top_n = 2
+                keep_top_n = 2 if self.deterministic_anchor_size is None else int(self.deterministic_anchor_size)
+                keep_top_n = max(0, min(cap, keep_top_n))
 
                 random_pick_n = cap - keep_top_n
 
@@ -859,7 +867,7 @@ class ServiceSampling(Sampling):
 
                 # ==========================================
 
-                if j == 2:
+                if self.visualize_hybrid_process and j == 2:
                     print(f"\n📊 正在生成 Server {j} 的详细流程图...")
 
                     visualize_detailed_hybrid_process(j, candidates_list)

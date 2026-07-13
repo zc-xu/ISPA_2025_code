@@ -2,7 +2,7 @@
 
 来源文件：
 - 回信文本：`C:\Users\m1870\.codex\attachments\300cc5db-bd6f-4cc3-b394-a6abaae324c8\pasted-text.txt`
-- 论文 PDF：`D:\wechat\WeChat Files\wxid_x4c4o8paef4422\FileStorage\File\2026-04\_Journal__MOS___A_Two_Stage_Multi_Objective_Framework_for_Server_Deployment_and_Service_Provisioning_in_Mobile_Edge_Computing(3).pdf`
+- 论文 PDF：本地保存的 MOS2 journal manuscript PDF（私人文件路径不写入公开仓库）
 - 代码仓库：`D:\pythonProject`
 
 ## 1. 总体结论

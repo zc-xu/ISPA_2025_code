@@ -4,4 +4,8 @@ __pycache__/
 .vscode/
 .idea/
 venv/
-dataset/ 
+dataset/
+/LocalSearch/Lib/site-packages/
+/LocalSearch/Scripts/
+/data/raw_station_pool/
+/output/csv/real_region_station_pool_loaded*.csv

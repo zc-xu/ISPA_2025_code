@@ -1,0 +1,2 @@
+Config,HVGapPct,IGDGap,BestQGap,RuntimeRatioJointOverMOS2,NormalizationLowerCost,NormalizationLowerDelay,NormalizationUpperCost,NormalizationUpperDelay
+joint_gap_c6_u30_k3_s4_seed44,0.9836147591605376,0.06597909062207402,0.0,6.092811498514909,305.8245010916258,92.5506968176324,495.27343119531884,161.65105794339016

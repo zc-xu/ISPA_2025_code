@@ -63,7 +63,7 @@ def write_config_manifest():
     return path
 
 
-def run_nsga_methods(config_name, context, pop_size=50, n_gen=200, seed=42):
+def run_nsga_methods(config_name, context, pop_size=50, n_gen=200, seed=42, visualize_hybrid_process=True):
     result_paths = []
     for offset, (mode, output_stem) in enumerate(METHOD_OUTPUTS.items()):
         method_seed = seed
@@ -73,7 +73,7 @@ def run_nsga_methods(config_name, context, pop_size=50, n_gen=200, seed=42):
         print(f"[{config_name}] Running NSGA-II initialization mode: {mode}")
         algorithm = NSGA2(
             pop_size=pop_size,
-            sampling=ServiceSampling(mode),
+            sampling=ServiceSampling(mode, visualize_hybrid_process=visualize_hybrid_process),
             repair=ServiceRepair(),
             eliminate_duplicates=True,
         )
