@@ -1,5 +1,7 @@
 # Real-region generalization experiment
 
+The canonical reviewer-facing evidence, expanded-region stress test, exact three-seed tables, and final response wording are maintained in `reviewer6_geographical_generalization_response.md`. This file records the search workflow and the selected alternate-region case.
+
 ## Reviewer concern
 
 Reviewer comment 6 points out that the experiments are based on a dataset collected around Xizhimen Subway Station, and the manuscript does not discuss whether the proposed framework generalizes to different geographical distributions, heterogeneous traffic densities, or larger MEC environments.
@@ -25,7 +27,7 @@ Reviewer comment 6 points out that the experiments are based on a dataset collec
 Use the original encrypted station pool directly:
 
 ```powershell
-$src='D:\data\BJ_Cell_Data.xlsx'
+$src='<path-to-station-pool.xlsx>'
 ```
 
 Stage I screening, 20 real candidate stations, 10 deployed servers, 130 users:
@@ -77,7 +79,7 @@ Stage II verification from a saved Stage I screen:
   --output-prefix real_region_stage2_c40_final_candidate
 ```
 
-## Results obtained so far
+## Verified results
 
 ### Stage I
 
@@ -89,7 +91,7 @@ Final selected candidate:
 |---|---:|---:|---:|---:|---:|---:|---:|
 | `real_sparse_r04_c40_u130_k10_s1` | sparse | 40 | 130 | 10 | 2304.7670 | 6150.5741 | 62.5276% |
 
-The final candidate uses 40 real base-station candidates and selects 10 deployed servers. Compared with the original compact Xizhimen setting, this case uses a larger candidate set and a wider, sparser user distribution. Its station radius is about 4.48 km, the user bounding box is about 6.70 km by 8.70 km, the user nearest-neighbor mean distance is about 0.335 km, and the station coverage-density CV is about 0.336. This gives a clear and reproducible real-region generalization case while avoiding the overly easy `CLSCost=0` cases found in some exploratory runs.
+The final candidate uses 40 real base-station candidates and selects 10 deployed servers. Its candidate centroid is 24.20 km from the original Xizhimen instance and its candidate count is doubled, while its user-footprint area is comparable to the original case (1.02 times rather than a wider spatial scale). Its station radius is about 4.48 km, the user bounding box is about 6.70 km by 8.70 km, the user nearest-neighbor mean distance is about 0.335 km, and the station coverage-density CV increases to about 0.336. This is therefore a geographical and real-station-topology transfer case; larger spatial coverage is evaluated separately in the expanded-region stress test. The real base-station coordinates and reproducibly generated user traffic must be described as distinct data sources.
 
 Other strong Stage-I candidates from the 30-candidate and 40-candidate screens:
 
@@ -111,7 +113,7 @@ For the selected `real_sparse_r04_c40_u130_k10_s1` case, Stage II was run with t
 | GDP | 1.0252 | 0.0405 | 0.0042 | 0.2385 |
 | PSP | 1.0490 | 0.0192 | 0.0075 | 0.2273 |
 
-For this fixed-seed paper-scale run, PSP is best on HV, IGD, and BestQ. This makes it the strongest current candidate for a manuscript figure or response-letter evidence.
+For this fixed-seed paper-scale run, PSP is best on HV, IGD, and BestQ. Final reporting uses the three-seed aggregate and scope statement in `reviewer6_geographical_generalization_response.md`.
 
 Additional Stage-II seed check for the same fixed Stage-I deployment:
 
@@ -133,16 +135,16 @@ Several exploratory cases looked good under lightweight settings but did not hol
 | `real_clustered_r00_c30_u130_k10_s0` | 30/60 looked good, 40/100 did not | Not used. |
 | `real_sparse_r03_c20_u130_k10_s2` | 40/100 showed PSP best HV/IGD, 50/200 did not | Not used as PSP-superiority evidence. |
 
-## Current recommendation
+## Reporting recommendation
 
-Use `real_sparse_r04_c40_u130_k10_s1` as the current main candidate for reviewer comment 6. It supports both parts of the framework:
+Use `real_sparse_r04_c40_u130_k10_s1` as the main reporting case for reviewer comment 6. It supports both parts of the framework:
 
-1. Stage I: CLS reduces deployment/access cost by 62.5276% relative to the best initialization baseline.
-2. Stage II: PSP achieves the best HV, IGD, and BestQ under the paper-scale seed-42 run, and the seed check shows stable HV/IGD advantages across seeds 42, 43, and 44.
+1. Stage I: CLS reduces the code-defined coverage/access objective by 62.5276% relative to the best recorded initialization-only placement.
+2. Stage II: PSP achieves the best three-seed mean HV, IGD, and BestQ; it is best in HV and IGD for seeds 42, 43, and 44 and best in BestQ for two of those seeds.
 
 Recommended response-letter wording:
 
-> To examine geographical generalization, we constructed an additional real-region MEC instance from the Beijing base-station pool, using 40 candidate stations in a wider sparse area and 130 generated users with heterogeneous spatial distribution. In this setting, CLS reduced the Stage-I deployment/access cost by 62.53% compared with the best initialization baseline. In Stage II, PSP achieved the best HV, IGD, and normalized weighted quality in the fixed-seed paper-scale run. Additional seed checks showed that PSP consistently obtained the best HV and IGD across the tested seeds, while obtaining the best weighted compromise in two of the three seeds.
+> To examine geographical generalization, we constructed an additional MEC instance using 40 real candidate-station coordinates from a region whose centroid is 24.20 km from the original Xizhimen instance, together with 130 reproducibly generated users. The user-footprint area is comparable to the original case, so this experiment evaluates transfer to a different real-station topology with twice as many candidates. CLS reduced the Stage-I coverage/access objective by 62.53% relative to the best recorded initialization-only placement. Across three tested Stage-II seeds, PSP obtained the best mean HV, IGD, and normalized weighted quality; it achieved the best HV and IGD for all three seeds and the best weighted compromise for two seeds.
 
 ## Figure files checked
 

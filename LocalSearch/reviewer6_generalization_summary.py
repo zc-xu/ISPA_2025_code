@@ -53,6 +53,11 @@ METHOD_COLORS = {
     "GDP": "#ff7f0e",
     "PSP": "#d62728",
 }
+PDF_METADATA = {
+    "Creator": "MOS2 reproducible experiment pipeline",
+    "CreationDate": None,
+    "ModDate": None,
+}
 SCENARIOS = OrderedDict(
     [
         ("sparse", "Sparse"),
@@ -320,7 +325,13 @@ def plot_topology_panels(design):
     fig.tight_layout(rect=(0, 0, 1, 0.90))
     for ext in ("png", "pdf"):
         path = os.path.join(OUT_PNG if ext == "png" else OUT_PDF, f"reviewer6_geography_comparison.{ext}")
-        fig.savefig(path, dpi=300 if ext == "png" else None, format=ext, bbox_inches="tight")
+        fig.savefig(
+            path,
+            dpi=300 if ext == "png" else None,
+            format=ext,
+            bbox_inches="tight",
+            metadata=PDF_METADATA if ext == "pdf" else None,
+        )
     plt.close(fig)
 
 
@@ -362,7 +373,13 @@ def plot_traffic_panels(design):
     fig.tight_layout(rect=(0, 0, 1, 0.88))
     for ext in ("png", "pdf"):
         path = os.path.join(OUT_PNG if ext == "png" else OUT_PDF, f"reviewer6_heterogeneous_traffic.{ext}")
-        fig.savefig(path, dpi=300 if ext == "png" else None, format=ext, bbox_inches="tight")
+        fig.savefig(
+            path,
+            dpi=300 if ext == "png" else None,
+            format=ext,
+            bbox_inches="tight",
+            metadata=PDF_METADATA if ext == "pdf" else None,
+        )
     plt.close(fig)
 
 
@@ -408,7 +425,78 @@ def plot_result_summary(stage1, aggregate):
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     for ext in ("png", "pdf"):
         path = os.path.join(OUT_PNG if ext == "png" else OUT_PDF, f"reviewer6_large_region_results.{ext}")
-        fig.savefig(path, dpi=300 if ext == "png" else None, format=ext, bbox_inches="tight")
+        fig.savefig(
+            path,
+            dpi=300 if ext == "png" else None,
+            format=ext,
+            bbox_inches="tight",
+            metadata=PDF_METADATA if ext == "pdf" else None,
+        )
+    plt.close(fig)
+
+
+def plot_main_candidate_summary(stage1, aggregate):
+    selected = stage1[stage1["Config"] == MAIN_CONFIG]
+    if len(selected) != 1:
+        raise ValueError(f"Expected one main Stage-I row for {MAIN_CONFIG}, found {len(selected)}.")
+
+    fig, axes = plt.subplots(2, 2, figsize=(10.8, 7.4))
+    improvement = float(selected.iloc[0]["CLSAdvantagePct"])
+    stage_bar = axes[0, 0].bar(
+        [0],
+        [improvement],
+        width=0.56,
+        color="#4C78A8",
+        edgecolor="black",
+        linewidth=0.45,
+        zorder=3,
+    )
+    axes[0, 0].bar_label(stage_bar, fmt="%.1f%%", padding=3, fontsize=10)
+    axes[0, 0].set_xticks([0], ["Alternate region"])
+    axes[0, 0].set_ylabel("CLS improvement (%)", fontsize=12)
+    axes[0, 0].set_title("Stage I", fontsize=13)
+
+    ordered = aggregate.set_index("Method").loc[METHODS]
+    for ax, metric, ylabel in zip(
+        axes.flat[1:],
+        ("HV", "IGD", "BestQ"),
+        ("HV (higher is better)", "IGD (lower is better)", "Best Q (lower is better)"),
+    ):
+        x = np.arange(len(METHODS))
+        values = ordered[f"{metric}Mean"].to_numpy(dtype=float)
+        errors = ordered[f"{metric}Std"].to_numpy(dtype=float)
+        ax.bar(
+            x,
+            values,
+            yerr=errors,
+            capsize=3,
+            color=[METHOD_COLORS[method] for method in METHODS],
+            edgecolor="black",
+            linewidth=0.45,
+            zorder=3,
+        )
+        ax.set_xticks(x, METHODS)
+        ax.set_ylabel(ylabel, fontsize=11)
+        ax.set_title(f"Stage II: {metric}", fontsize=13)
+
+    for ax in axes.flat:
+        ax.tick_params(axis="both", labelsize=10)
+        ax.grid(True, axis="y", linestyle="--", linewidth=0.65, alpha=0.60, zorder=0)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+    fig.tight_layout()
+    for ext in ("png", "pdf"):
+        path = os.path.join(
+            OUT_PNG if ext == "png" else OUT_PDF,
+            f"reviewer6_main_candidate_results.{ext}",
+        )
+        fig.savefig(
+            path,
+            dpi=300 if ext == "png" else None,
+            format=ext,
+            bbox_inches="tight",
+            metadata=PDF_METADATA if ext == "pdf" else None,
+        )
     plt.close(fig)
 
 
@@ -447,6 +535,8 @@ def main():
     plot_topology_panels(design)
     plot_traffic_panels(design)
     plot_result_summary(stage1, wide_aggregate)
+    main_stage1 = pd.read_csv(MAIN_STAGE1_CSV)
+    plot_main_candidate_summary(main_stage1, main_aggregate)
 
     print(design[["Dataset", "Candidates", "Users", "CenterDistanceFromOriginalKm", "UserWidthKm", "UserHeightKm", "AreaScaleVsOriginal", "CoverageDensityCV"]].to_string(index=False, float_format=lambda value: f"{value:.4f}"))
     print("\nWide-region Stage I:")
