@@ -21,7 +21,7 @@
 | 多规模实验数据对应关系不清楚。 | 代码仓库里 Excel 较多，难以判断哪个文件对应哪组论文实验。 | 已新增显式配置清单，列出 7 组候选实验配置、用户规模、服务器规模、`sigma_min` 和 `n2_adjust`。 | `LocalSearch/experiment_configs.py`；`output/csv/experiment_config_manifest.csv`。 | 后续如需完整复现实验，可直接用 `--configs all` 或指定配置名。 |
 | 两阶段分解合理性不足。 | 审稿人担心先服务器部署、再服务部署会牺牲全局最优性。 | 新增小规模 Joint-Exact 对比。6 candidates/30 users/3 servers/4 services 的三个种子中，Best Q gap 均为 0，平均 HV gap 为 3.87%，联合穷举平均约慢 5.85 倍。 | `LocalSearch/joint_optimality_gap.py`；`output/csv/joint_gap_summary_c6_u30_k3_s4_seeds42_44.csv`。 | 写入正文与 response；明确这是小规模经验差距，不是理论最优性保证。 |
 | `varpi_j` 选择依据不足。 | 确定性 anchor 大小看似任意，缺少与容量 `V_j` 的关系。 | 将 `varpi_j` 和 `V_j` 参数化，并完成 144 次容量敏感性运行。保留 `varpi_j=ceil(0.5V_j)` 作为 exploitation/exploration 的比例式默认折中。 | `LocalSearch/hybrid_anchor_sensitivity.py`；`docs/revision/03_experiment_baselines/hybrid_anchor_sensitivity.md`。 | 不声称半容量稳定最优；实验可放 response 或补充材料。 |
-| 地理和流量泛化不足。 | 原稿只在西直门附近数据上验证。 | 新增三组合成分布和真实北京稀疏区域实例。最终真实候选为 40 candidates/130 users/10 servers，Stage I CLS 优势 62.53%；Stage II 多种子下 PSP 的 HV/IGD 优势稳定。 | `LocalSearch/generalization_experiments.py`；`LocalSearch/real_region_generalization.py`；`LocalSearch/run_real_region_stage2.py`。 | 正文使用真实区域结果；合成结果谨慎放 response/补充材料。 |
+| 地理和流量泛化不足。 | 原稿只在西直门附近数据上验证，缺少不同区域、异构流量和扩大尺度证据。 | 新增两层真实基站拓扑实验：正文候选距原区域质心 24.20 km，40 candidates/130 users/10 servers，Stage I CLS 优势 62.53%，Stage II 三 seed 下 PSP 的 HV/IGD/Best Q 均值最优；扩大区域为原用户覆盖面积的 2.25--2.88 倍，三种流量下 CLS 优势为 26.63%/34.82%/51.54%，但 PSP 并非始终最优。 | `LocalSearch/real_region_generalization.py`；`LocalSearch/run_real_region_stage2.py`；`LocalSearch/reviewer6_generalization_summary.py`；`docs/revision/03_experiment_baselines/reviewer6_geographical_generalization_response.md`；`output/excel/reviewer6_generalization_evidence.xlsx`。 | 正文使用另一真实区域结果；扩大区域完整压力测试放 response/补充材料，并明确真实基站拓扑与可复现生成流量的边界。 |
 | 变量定义和符号不统一。 | 公式可读性和模型可信度受影响。 | 已统一服务部署、关联和容量相关符号，并补充归一化 cost/delay 和 Q 定义。 | `D:\NDM\conference_101719.tex`。 | 后续编译后检查公式编号、表格和正文引用。 |
 | QoS/reliability 讨论不足。 | 实际 MEC 场景还涉及丢包、中断、链路可用性等可靠性因素。 | 已加入 reliability-aware QoS 讨论，作为模型可扩展约束和未来工作。 | `D:\NDM\conference_101719.tex`。 | 当前不扩展实验，避免返修工作量失控。 |
 | 图示解释不足。 | Fig. 1/Fig. 2 对服务器区域、服务路径和流程机制说明不够。 | 已修改 caption；图本身等待 Visio 源文件后再统一重画。 | `D:\NDM\conference_101719.tex`。 | 拿到 Visio 后简化路径、突出 Stage I/Stage II、保持论文图风格一致。 |
@@ -39,6 +39,8 @@
 | `LocalSearch/generalization_experiments.py` | 生成并运行三类可复现合成地理分布。 |
 | `LocalSearch/real_region_generalization.py` | 从真实北京基站池筛选不同区域并运行 Stage I。 |
 | `LocalSearch/run_real_region_stage2.py` | 对保存的真实区域候选运行 Stage II。 |
+| `LocalSearch/reviewer6_generalization_summary.py` | 校验 Reviewer 2 Comment 6 的多 seed 指标，生成设计表、聚合表和论文风格 PNG/PDF。 |
+| `LocalSearch/build_reviewer6_workbook.mjs` | 将 Reviewer 2 Comment 6 的设计、明细、聚合结果和公式驱动图表整理为可审计 Excel。 |
 | `LocalSearch/joint_optimality_gap.py` | 小规模 Joint-Exact 与 MOS2-PSP 对比。 |
 | `LocalSearch/dqn_service_baseline.py` | 可复现 DQN 学习型服务放置 baseline。 |
 | `LocalSearch/plot_dqn_control_results.py` | 生成 paper-aligned 与 full-rerun 两套 DQN 控制变量图。 |

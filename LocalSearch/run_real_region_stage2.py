@@ -58,6 +58,7 @@ def run(args):
     screen = load_screen(args.screen_csv)
     selected = select_rows(screen, args)
     rows = []
+    metric_rows = []
     for _, row in selected.iterrows():
         config_name = row["Config"]
         print(f"[stage2] {config_name}", flush=True)
@@ -82,6 +83,10 @@ def run(args):
                     visualize_hybrid_process=False,
                 )
                 metrics = run_pareto_metrics(config_name=config_name, alpha=args.metric_alpha)
+        metrics = metrics.copy()
+        metrics.insert(0, "Seed", int(args.seed))
+        metrics.insert(0, "ConfigName", config_name)
+        metric_rows.append(metrics)
         ranking = rank_stage2(metrics)
         ranking["Config"] = config_name
         if "CLSCost" in row:
@@ -100,8 +105,15 @@ def run(args):
     xlsx_path = os.path.join(OUT_XLSX_DIR, f"{args.output_prefix}.xlsx")
     result.to_csv(csv_path, index=False)
     result.to_excel(xlsx_path, index=False)
+    metric_detail = pd.concat(metric_rows, ignore_index=True)
+    metric_csv_path = os.path.join(OUT_CSV_DIR, f"{args.output_prefix}_metrics.csv")
+    metric_xlsx_path = os.path.join(OUT_XLSX_DIR, f"{args.output_prefix}_metrics.xlsx")
+    metric_detail.to_csv(metric_csv_path, index=False)
+    metric_detail.to_excel(metric_xlsx_path, index=False)
     print("Saved:", csv_path)
     print("Saved:", xlsx_path)
+    print("Saved:", metric_csv_path)
+    print("Saved:", metric_xlsx_path)
     print(result.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
 
 
