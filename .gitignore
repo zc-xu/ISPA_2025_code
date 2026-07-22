@@ -9,3 +9,7 @@ dataset/
 /LocalSearch/Scripts/
 /data/raw_station_pool/
 /output/csv/real_region_station_pool_loaded*.csv
+/tmp/
+**/node_modules/
+/output/map_cache/
+*.inspect.ndjson

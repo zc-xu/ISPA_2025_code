@@ -1,0 +1,13 @@
+*.docx binary
+*.jpeg binary
+*.jpg binary
+*.npz binary
+*.pdf binary
+*.png binary
+*.svg binary
+*.vsdx binary
+*.xls binary
+*.xlsx binary
+*.cls whitespace=-trailing-space
+*.md whitespace=-trailing-space
+*.tex whitespace=-trailing-space

@@ -4,10 +4,14 @@ This directory collects the manuscript revision notes, reviewer-response plannin
 
 ## Start Here
 
-Read `HANDOFF_2026-07-17.md` first. It records the current GitHub handoff status, the completed Reviewer 2 Comment 6 generalization experiments, validated results, reproducibility commands, and manuscript-use boundaries.
+Read `HANDOFF_2026-07-22.md` first. It records the complete round-1 manuscript and response package, validated experiments, reproducibility commands, archived source materials, and continuation steps for another computer.
 
 ## Directory Layout
 
+- `HANDOFF_2026-07-22.md`
+  - Current handoff for the complete manuscript, response letter, figures, experiment evidence, and dated research snapshot.
+- `HANDOFF_2026-07-19.md`
+  - Recovery of the original Stage-II paper values and the corrected DQN fifth-method comparison.
 - `HANDOFF_2026-07-17.md`
   - Current handoff for the alternate-region and expanded-region geographical generalization experiments.
 - `HANDOFF_2026-07-14.md`

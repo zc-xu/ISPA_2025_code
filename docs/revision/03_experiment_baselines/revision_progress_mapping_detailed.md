@@ -19,9 +19,9 @@
 | CLS 初始化敏感性解释不足。 | Algorithm 1 的初始部署集合 `S` 随机生成，审稿人担心不同初值导致不同局部最优。 | 已新增 CLS 初始化敏感性实验，对比 random、density、distance-sum、greedy、density-diverse 五类初值。主图改为固定 130 用户规模 heatmap；另提供 `10_150` Random vs Greedy 辅助图。 | `LocalSearch/cls_initialization_sensitivity.py`；`output/pdf/cls_init_sensitivity_130_heatmap.pdf`；`output/pdf/cls_init_random_vs_greedy_10_150.pdf`；`output/csv/cls_init_sensitivity_all_data_scan.csv`。 | 正文主结论写 CLS 对初始化整体不敏感；辅助结论写单纯 Greedy 不一定更好。不要写 Random 普遍优于所有初始化。 |
 | 缺少 Pareto front 定量指标。 | 原稿主要依赖散点图和加权 Q，缺少通用指标。 | 已新增 `HV`、`IGD`、`Best Q`，并生成 CSV、Excel、PDF、PNG。 | `LocalSearch/pareto_batch_metrics.py`；`output/pdf/pareto_metrics_10_130.pdf`。 | 正文说明指标方向：`HV` 越高越好；`IGD`、`Best Q` 越低越好。 |
 | 多规模实验数据对应关系不清楚。 | 代码仓库里 Excel 较多，难以判断哪个文件对应哪组论文实验。 | 已新增显式配置清单，列出 7 组候选实验配置、用户规模、服务器规模、`sigma_min` 和 `n2_adjust`。 | `LocalSearch/experiment_configs.py`；`output/csv/experiment_config_manifest.csv`。 | 后续如需完整复现实验，可直接用 `--configs all` 或指定配置名。 |
-| 两阶段分解合理性不足。 | 审稿人担心先服务器部署、再服务部署会牺牲全局最优性。 | 新增小规模 Joint-Exact 对比。6 candidates/30 users/3 servers/4 services 的三个种子中，Best Q gap 均为 0，平均 HV gap 为 3.87%，联合穷举平均约慢 5.85 倍。 | `LocalSearch/joint_optimality_gap.py`；`output/csv/joint_gap_summary_c6_u30_k3_s4_seeds42_44.csv`。 | 写入正文与 response；明确这是小规模经验差距，不是理论最优性保证。 |
+| 两阶段分解合理性不足。 | 审稿人担心先服务器部署、再服务部署会牺牲全局最优性。 | 新增小规模 Joint-Exact 对比。6 candidates/30 users/3 servers/4 services 的三个种子中，Best Q gap 均为 0，平均 HV gap 为 3.87%，联合穷举平均约慢 5.18 倍。 | `LocalSearch/joint_optimality_gap.py`；`output/csv/joint_gap_summary_c6_u30_k3_s4_seeds42_44.csv`。 | 正文保留分解原理与非全局最优说明；详细实验用于 response。 |
 | `varpi_j` 选择依据不足。 | 确定性 anchor 大小看似任意，缺少与容量 `V_j` 的关系。 | 将 `varpi_j` 和 `V_j` 参数化，并完成 144 次容量敏感性运行。保留 `varpi_j=ceil(0.5V_j)` 作为 exploitation/exploration 的比例式默认折中。 | `LocalSearch/hybrid_anchor_sensitivity.py`；`docs/revision/03_experiment_baselines/hybrid_anchor_sensitivity.md`。 | 不声称半容量稳定最优；实验可放 response 或补充材料。 |
-| 地理和流量泛化不足。 | 原稿只在西直门附近数据上验证，缺少不同区域、异构流量和扩大尺度证据。 | 新增两层真实基站拓扑实验：正文候选距原区域质心 24.20 km，40 candidates/130 users/10 servers，Stage I CLS 优势 62.53%，Stage II 三 seed 下 PSP 的 HV/IGD/Best Q 均值最优；扩大区域为原用户覆盖面积的 2.25--2.88 倍，三种流量下 CLS 优势为 26.63%/34.82%/51.54%，但 PSP 并非始终最优。 | `LocalSearch/real_region_generalization.py`；`LocalSearch/run_real_region_stage2.py`；`LocalSearch/reviewer6_generalization_summary.py`；`docs/revision/03_experiment_baselines/reviewer6_geographical_generalization_response.md`；`output/excel/reviewer6_generalization_evidence.xlsx`。 | 正文使用另一真实区域结果；扩大区域完整压力测试放 response/补充材料，并明确真实基站拓扑与可复现生成流量的边界。 |
+| 地理和流量泛化不足。 | 原稿只在西直门附近数据上验证，缺少不同真实区域、异构空间密度和更大候选拓扑的证据。 | 新增另一真实基站区域的端到端实验：新旧候选基站质心相距 24.20 km，配置为 40 candidates/130 users/10 servers/8 services；Stage I 中 CLS 将最好非 CLS 初始化目标降低 62.53%；Stage II 三个随机种子下，PSP 的平均 HV 最高，平均 IGD 和 Best Q 最低，并在统一 Best Q 尺度下优于 DQN。 | `LocalSearch/real_region_generalization.py`；`LocalSearch/run_real_region_stage2.py`；`LocalSearch/dqn_service_baseline.py`；`LocalSearch/plot_reviewer6_topology.py`；`LocalSearch/plot_reviewer6_bestq.py`；`docs/revision/03_experiment_baselines/reviewer6_geographical_generalization_response.md`；`output/excel/reviewer6_generalization_paper_style.xlsx`。 | 已形成可直接使用的地理部署图、五方法 Best Q 柱图、HV/IGD/Best Q 指标表及中英文回复。 |
 | 变量定义和符号不统一。 | 公式可读性和模型可信度受影响。 | 已统一服务部署、关联和容量相关符号，并补充归一化 cost/delay 和 Q 定义。 | `D:\NDM\conference_101719.tex`。 | 后续编译后检查公式编号、表格和正文引用。 |
 | QoS/reliability 讨论不足。 | 实际 MEC 场景还涉及丢包、中断、链路可用性等可靠性因素。 | 已加入 reliability-aware QoS 讨论，作为模型可扩展约束和未来工作。 | `D:\NDM\conference_101719.tex`。 | 当前不扩展实验，避免返修工作量失控。 |
 | 图示解释不足。 | Fig. 1/Fig. 2 对服务器区域、服务路径和流程机制说明不够。 | 已修改 caption；图本身等待 Visio 源文件后再统一重画。 | `D:\NDM\conference_101719.tex`。 | 拿到 Visio 后简化路径、突出 Stage I/Stage II、保持论文图风格一致。 |
@@ -39,8 +39,10 @@
 | `LocalSearch/generalization_experiments.py` | 生成并运行三类可复现合成地理分布。 |
 | `LocalSearch/real_region_generalization.py` | 从真实北京基站池筛选不同区域并运行 Stage I。 |
 | `LocalSearch/run_real_region_stage2.py` | 对保存的真实区域候选运行 Stage II。 |
-| `LocalSearch/reviewer6_generalization_summary.py` | 校验 Reviewer 2 Comment 6 的多 seed 指标，生成设计表、聚合表和论文风格 PNG/PDF。 |
-| `LocalSearch/build_reviewer6_workbook.mjs` | 将 Reviewer 2 Comment 6 的设计、明细、聚合结果和公式驱动图表整理为可审计 Excel。 |
+| `LocalSearch/reviewer6_generalization_summary.py` | 校验 Reviewer 2 Comment 6 的多 seed 结果并汇总 Stage I、Stage II 和 DQN 证据表。 |
+| `LocalSearch/plot_reviewer6_topology.py` | 按论文原地图语义绘制新真实区域的用户服务类型、候选站、CLS 服务器、覆盖半径和用户归属。 |
+| `LocalSearch/plot_reviewer6_bestq.py` | 绘制 NS-P、PSP、GCP、GDP 和 DQN 的三种子 Best Q 均值及样本标准差。 |
+| `LocalSearch/build_reviewer6_paper_workbook.mjs` | 基于原论文 Excel 图表模板生成可编辑五方法柱图、指标表、逐种子结果和图件说明。 |
 | `LocalSearch/joint_optimality_gap.py` | 小规模 Joint-Exact 与 MOS2-PSP 对比。 |
 | `LocalSearch/dqn_service_baseline.py` | 可复现 DQN 学习型服务放置 baseline。 |
 | `LocalSearch/plot_dqn_control_results.py` | 生成 paper-aligned 与 full-rerun 两套 DQN 控制变量图。 |
@@ -110,13 +112,12 @@
 
 可以这样汇报：
 
-> 当前代码保留统一实验配置、批量运行入口、Pareto 指标统计、CLS 初始化敏感性和 DQN 学习型 baseline。DQN 在七组控制变量配置下均按五个偏好权重训练；10/130 中 PSP 的 HV/IGD/BestQ 为 0.9582/0.0016/0.3185，DQN 为 0.3382/0.4048/0.5974，表明标准标量化 DQN 在声明预算下弱于 PSP。图中 DQN 只显示独立点或柱，不连接成连续 Pareto 曲线。CLS 初始化实验则显示多数数据集最终结果接近，同时单纯贪心在 10/150 中可能陷入较差局部最优。
+> 当前代码保留统一实验配置、批量运行入口、Pareto 指标统计、CLS 初始化敏感性和 DQN 学习型 baseline。Stage-II 规模实验已经恢复为原论文工作簿中的四方法结果，并在相同配置下加入 DQN 第五柱。PSP 在七个不同配置中均取得最低 Best Q，相较每个配置中最强的其他进化初始化方法降低 2.26%--9.53%，平均降低 4.11%。10/130 代表性配置中，PSP 的 HV/IGD/Best Q 为 0.9470/0.0016/0.3282，DQN 的 Best Q 为 0.6125。DQN 的五个偏好输出不连接成连续 Pareto 曲线，HV/IGD 仅用于四个等规模进化种群。CLS 初始化实验显示多数数据集最终结果接近，同时单纯贪心在 10/150 中可能陷入较差局部最优。
 
 ## 6. 后续待办
 
-1. 将小规模 Joint-Exact 结果和两阶段合理性讨论写入正文与 response。
-2. 将真实稀疏区域泛化结果写入正文，合成结果作为补充证据。
-3. 将 10/130 Pareto 指标和 CLS 初始化敏感性结果写入实验分析。
-4. 保留比例式 `varpi_j` 解释，但不声称半容量是实验最优。
-5. 拿到 Visio 源文件后修改 Fig. 1/Fig. 2，并统一原稿图字号。
-6. 将已完成的 DQN 建模、训练预算和结果写入正文及 response；SPEA2 不纳入，后续仅在需要完整学习型 Pareto set 时再考虑 preference-conditioned MORL。
+1. 拿到 Visio 源文件后修改 Fig. 1/Fig. 2，并统一其余旧实验图字号。
+2. 确认 IEEE Internet of Things Journal 正式模板，当前 TeX 仍是 IEEE conference 模式。
+3. 在 Overleaf 中分别编译标记稿和清洁稿，核对图号、页码、作者单位、基金和参考文献。
+4. 小规模 Joint-Exact 与真实稀疏区域泛化实验按当前决定保留在 response；提交时附上对应结果证据。
+5. 若找回 10/150、10/180、15/130、20/130 的历史原始 NPZ，再复核 DQN Best Q 的末位小数。
