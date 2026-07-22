@@ -1,0 +1,2 @@
+Config,Variant,Seed,DataFile,MeanAbsoluteError,MaxAbsoluteError,PSPBestQ
+10_150,configured,44,data/input_data_10_150_8_new.xlsx,0.019847882517406698,0.031631465581724694,0.2665515382424233

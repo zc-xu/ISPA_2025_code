@@ -1,0 +1,2 @@
+Config,DataFile,Users,Candidates,TargetServers,ResolvedK,SigmaMin,N2Adjust,N2Raw,CLSCost,RandomMeanCost,RandomBestCost,DensityCost,DistSumCost,GreedyCost,DiverseInitCost,BestBaselineCost,CLSAdvantagePct,SelectedSolution
+real_sparse_r04_c40_u130_k10_s1,data\real_region\input_data_real_sparse_r04_c40_u130_k10_s1_8.xlsx,130,40,10,10,33,1,9,2304.7669645477567,13540.517511777573,6150.574075411073,22206.475065897397,28513.33967960432,28513.33967960432,19031.79594268241,6150.574075411073,62.52761227993636,0 2 8 16 19 29 35 37 38 39
