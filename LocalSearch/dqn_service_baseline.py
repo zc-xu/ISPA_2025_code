@@ -3,7 +3,7 @@ import glob
 import os
 import random
 import sys
-from collections import deque
+from collections import OrderedDict, deque
 
 import numpy as np
 import pandas as pd
@@ -42,13 +42,18 @@ def nondominated_mask(points):
     return keep
 
 
-def reference_bounds(config_name):
+def reference_bounds(config_name, seed=None):
     arrays = []
     npz_dir = os.path.join(PROJECT_ROOT, "output", "npz")
     for stem in BASELINE_FILES:
-        candidates = [os.path.join(npz_dir, f"{stem}_{config_name}.npz")]
-        if config_name == "10_130":
-            candidates.append(os.path.join(npz_dir, f"{stem}.npz"))
+        if seed is not None:
+            candidates = [
+                os.path.join(npz_dir, "seed_checks", f"{stem}_{config_name}_seed{seed}.npz")
+            ]
+        else:
+            candidates = [os.path.join(npz_dir, f"{stem}_{config_name}.npz")]
+            if config_name == "10_130":
+                candidates.append(os.path.join(npz_dir, f"{stem}.npz"))
         path = next((item for item in candidates if os.path.exists(item)), None)
         if path:
             with np.load(path) as result:
@@ -57,6 +62,33 @@ def reference_bounds(config_name):
         raise FileNotFoundError(f"No Stage II reference results found for {config_name}.")
     combined = np.vstack(arrays)
     return np.min(combined, axis=0), np.max(combined, axis=0)
+
+
+def select_screen_configs(path, names):
+    full_path = path if os.path.isabs(path) else os.path.join(PROJECT_ROOT, path)
+    frame = pd.read_csv(full_path)
+    required = {"Config", "DataFile", "TargetServers", "SigmaMin", "N2Adjust", "Users"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"Stage-I screen file is missing required columns: {sorted(missing)}")
+
+    selected = frame if not names or names == ["all"] else frame[frame["Config"].isin(names)]
+    if names and names != ["all"]:
+        absent = [name for name in names if name not in set(selected["Config"])]
+        if absent:
+            raise ValueError(f"Configs not found in Stage-I screen file: {absent}")
+
+    configs = OrderedDict()
+    for _, row in selected.iterrows():
+        configs[row["Config"]] = {
+            "data_file": row["DataFile"],
+            "target_servers": int(row["TargetServers"]),
+            "sigma_min": int(row["SigmaMin"]),
+            "n2_adjust": int(row["N2Adjust"]),
+            "series": "real_region",
+            "users": int(row["Users"]),
+        }
+    return configs
 
 
 class ServicePlacementEnv:
@@ -311,20 +343,32 @@ def run_config(config_name, config, args):
         max_iter=args.stage1_iter,
         verbose=False,
     )
-    lower, upper = reference_bounds(config_name)
-    print(f"K={context['k']}, users={len(context['user_positions'])}, bounds={lower}..{upper}")
+    print(f"K={context['k']}, users={len(context['user_positions'])}")
     solutions = []
     objectives = []
     summary_rows = []
     training_rows = []
+    results_by_seed = OrderedDict()
     for dqn_seed in args.dqn_seeds:
+        reference_seed = dqn_seed if args.reference_by_seed else None
+        lower, upper = reference_bounds(config_name, seed=reference_seed)
+        print(f"seed={dqn_seed}, reference bounds={lower}..{upper}")
+        seed_solutions = []
+        seed_objectives = []
         for weight in args.weights:
             best, rows = train_one(
                 config_name, config, context, weight, dqn_seed, args, lower, upper
             )
             scalar, matrix, objective, episode = best
+            normalized = (objective - lower) / np.maximum(upper - lower, 1e-12)
+            evaluation_q = (
+                args.evaluation_alpha * normalized[0]
+                + (1.0 - args.evaluation_alpha) * normalized[1]
+            )
             solutions.append(matrix.reshape(-1))
             objectives.append(objective)
+            seed_solutions.append(matrix.reshape(-1))
+            seed_objectives.append(objective)
             training_rows.extend(rows)
             summary_rows.append(
                 {
@@ -335,12 +379,23 @@ def run_config(config_name, config, args):
                     "Cost": objective[0],
                     "Delay": objective[1],
                     "ScalarQReferenceBounds": scalar,
+                    "EvaluationAlpha": args.evaluation_alpha,
+                    "EvaluationBestQ": evaluation_q,
+                    "ReferenceLowerCost": lower[0],
+                    "ReferenceLowerDelay": lower[1],
+                    "ReferenceUpperCost": upper[0],
+                    "ReferenceUpperDelay": upper[1],
                 }
             )
             print(
                 f"weight={weight:.2f}, seed={dqn_seed}: cost={objective[0]:.4f}, "
-                f"delay={objective[1]:.4f}, q={scalar:.4f}"
+                f"delay={objective[1]:.4f}, train_q={scalar:.4f}, "
+                f"eval_q={evaluation_q:.4f}"
             )
+        results_by_seed[int(dqn_seed)] = (
+            np.asarray(seed_solutions, dtype=np.int8),
+            np.asarray(seed_objectives, dtype=float),
+        )
 
     X = np.asarray(solutions, dtype=np.int8)
     F = np.asarray(objectives, dtype=float)
@@ -356,6 +411,21 @@ def run_config(config_name, config, args):
         seeds=np.asarray(args.dqn_seeds, dtype=int),
         episodes=np.asarray([args.episodes], dtype=int),
     )
+    seed_dir = os.path.join(PROJECT_ROOT, "output", "npz", "seed_checks")
+    os.makedirs(seed_dir, exist_ok=True)
+    for dqn_seed, (seed_X, seed_F) in results_by_seed.items():
+        seed_keep = nondominated_mask(seed_F)
+        seed_path = os.path.join(seed_dir, f"res_dqn_{config_name}_seed{dqn_seed}.npz")
+        np.savez(
+            seed_path,
+            X=seed_X,
+            F=seed_F,
+            pareto_X=seed_X[seed_keep],
+            pareto_F=seed_F[seed_keep],
+            weights=np.asarray(args.weights, dtype=float),
+            seed=np.asarray([dqn_seed], dtype=int),
+            episodes=np.asarray([args.episodes], dtype=int),
+        )
     if config_name == "10_130":
         np.savez(
             os.path.join(PROJECT_ROOT, "output", "npz", "res_dqn.npz"),
@@ -380,6 +450,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Reproducible DQN baseline for Stage II service placement.")
     parser.add_argument("--configs", nargs="+", default=["10_130"])
     parser.add_argument("--weights", nargs="+", type=float, default=[0.1, 0.3, 0.5, 0.7, 0.9])
+    parser.add_argument(
+        "--evaluation-alpha",
+        type=float,
+        default=0.5,
+        help="Fixed normalized-cost weight used for cross-method BestQ evaluation.",
+    )
     parser.add_argument("--dqn-seeds", nargs="+", type=int, default=[42])
     parser.add_argument("--episodes", type=int, default=320)
     parser.add_argument("--hidden", type=int, default=64)
@@ -393,6 +469,8 @@ def parse_args():
     parser.add_argument("--stage-seed", type=int, default=42)
     parser.add_argument("--coverage-radius", type=float, default=1.5)
     parser.add_argument("--stage1-iter", type=int, default=200)
+    parser.add_argument("--screen-csv", default=None)
+    parser.add_argument("--reference-by-seed", action="store_true")
     return parser.parse_args()
 
 
@@ -400,8 +478,14 @@ def main():
     args = parse_args()
     if any(weight < 0.0 or weight > 1.0 for weight in args.weights):
         raise ValueError("All weights must be within [0, 1].")
+    if not 0.0 <= args.evaluation_alpha <= 1.0:
+        raise ValueError("--evaluation-alpha must be within [0, 1].")
     ensure_dirs()
-    selected = select_configs(args.configs)
+    selected = (
+        select_screen_configs(args.screen_csv, args.configs)
+        if args.screen_csv
+        else select_configs(args.configs)
+    )
     for config_name, config in selected.items():
         run_config(config_name, config, args)
     frames = []

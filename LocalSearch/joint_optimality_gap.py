@@ -14,7 +14,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 
@@ -32,7 +31,12 @@ from LocalSearch.experiment_utils import (
     coverage_local_search,
     load_input_from_excel,
 )
-from LocalSearch.nsga_service_deploy import MyServiceDeployProblem, ServiceRepair, ServiceSampling
+from LocalSearch.nsga_service_deploy import (
+    MyServiceDeployProblem,
+    ServiceRepair,
+    ServiceSampling,
+    build_nsga2_algorithm,
+)
 from LocalSearch.pareto_batch_metrics import calculate_metrics, nondominated
 
 
@@ -151,16 +155,16 @@ def run_mos2_psp(candidate_positions, user_positions, user_services, k, num_serv
         assigned_server=assigned,
         num_services=num_services,
     )
-    algorithm = NSGA2(
+    algorithm = build_nsga2_algorithm(
         pop_size=pop_size,
         sampling=ServiceSampling(
             "hybrid-A-1",
-            deterministic_anchor_size=min(2, capacity),
+            deterministic_anchor_size=int(np.ceil(0.5 * capacity)),
             visualize_hybrid_process=False,
             capacity_per_server=capacity,
         ),
         repair=ServiceRepair(capacity_per_server=capacity),
-        eliminate_duplicates=True,
+        n_var=problem.n_var,
     )
     res = minimize(
         problem,

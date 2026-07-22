@@ -508,7 +508,21 @@ def plot_fixed_130_heatmap(summary):
     return pdf_path
 
 
-def plot_random_greedy_case(summary, config_name="10_150"):
+def _gap_standard_errors(results, config_name, strategies):
+    errors = []
+    for strategy in strategies:
+        values = results.loc[
+            (results["Config"] == config_name) & (results["Strategy"] == strategy),
+            "FinalGapPct",
+        ].astype(float)
+        if len(values) > 1:
+            errors.append(float(values.std(ddof=1) / np.sqrt(len(values))))
+        else:
+            errors.append(0.0)
+    return errors
+
+
+def plot_random_greedy_case(summary, results, config_name="10_150"):
     group = summary[summary["Config"] == config_name].set_index("Strategy")
     required = ["random", "greedy_marginal"]
     if not all(strategy in group.index for strategy in required):
@@ -516,6 +530,7 @@ def plot_random_greedy_case(summary, config_name="10_150"):
 
     labels = [STRATEGY_LABELS[strategy] for strategy in required]
     values = [float(group.loc[strategy, "MeanGapPct"]) for strategy in required]
+    errors = _gap_standard_errors(results, config_name, required)
     colors = [STRATEGY_COLORS[strategy] for strategy in required]
 
     plt.rcParams["font.family"] = "Arial"
@@ -528,6 +543,9 @@ def plot_random_greedy_case(summary, config_name="10_150"):
         edgecolor="black",
         linewidth=0.5,
         width=0.55,
+        yerr=errors,
+        capsize=4,
+        error_kw={"elinewidth": 1.0, "ecolor": "#444444", "capthick": 1.0},
         zorder=3,
     )
     for bar, value in zip(bars, values):
@@ -553,6 +571,107 @@ def plot_random_greedy_case(summary, config_name="10_150"):
     png_path = os.path.join(PROJECT_ROOT, "output", "png", f"cls_init_random_vs_greedy_{config_name}.png")
     fig.savefig(pdf_path, format="pdf", bbox_inches="tight")
     fig.savefig(png_path, format="png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return pdf_path
+
+
+def plot_combined_initialization_figure(summary, results):
+    configs = [
+        config
+        for config in ["5_130", "10_130", "15_130", "20_130"]
+        if config in set(summary["Config"])
+    ]
+    strategies = [strategy for strategy in STRATEGY_LABELS if strategy in set(summary["Strategy"])]
+    focus_config = "10_150"
+    focus_strategies = ["random", "greedy_marginal"]
+    if not configs or focus_config not in set(summary["Config"]):
+        return None
+
+    matrix = np.zeros((len(strategies), len(configs)), dtype=float)
+    for row, strategy in enumerate(strategies):
+        subset = summary[summary["Strategy"] == strategy].set_index("Config")
+        for col, config in enumerate(configs):
+            matrix[row, col] = subset.loc[config, "MeanGapPct"] if config in subset.index else np.nan
+
+    focus = summary[summary["Config"] == focus_config].set_index("Strategy")
+    values = [float(focus.loc[strategy, "MeanGapPct"]) for strategy in focus_strategies]
+    labels = [STRATEGY_LABELS[strategy] for strategy in focus_strategies]
+    colors = [STRATEGY_COLORS[strategy] for strategy in focus_strategies]
+
+    plt.rcParams.update(
+        {
+            "font.family": "serif",
+            "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+            "axes.unicode_minus": False,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+        }
+    )
+    # Sized for an IEEE two-column paper's single-column width.
+    fig = plt.figure(figsize=(3.45, 1.78))
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.48, 0.94], wspace=0.82)
+
+    ax_heat = fig.add_subplot(grid[0])
+    vmax = max(float(np.nanmax(matrix)), 1.0)
+    image = ax_heat.imshow(matrix, cmap="YlOrRd", vmin=0.0, vmax=vmax, aspect="auto")
+    ax_heat.set_xticks(np.arange(len(configs)))
+    ax_heat.set_xticklabels([config.replace("_", "/") for config in configs], fontsize=5.7)
+    ax_heat.set_yticks(np.arange(len(strategies)))
+    ax_heat.set_yticklabels([STRATEGY_LABELS[strategy] for strategy in strategies], fontsize=5.7)
+    ax_heat.set_xlabel("Servers/users", fontsize=6.2, labelpad=1.5)
+    ax_heat.set_ylabel("Initialization", fontsize=6.2, labelpad=1.5)
+    for row in range(matrix.shape[0]):
+        for col in range(matrix.shape[1]):
+            value = matrix[row, col]
+            color = "white" if value > 0.58 * vmax else "#222222"
+            ax_heat.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=5.2, color=color)
+    ax_heat.set_xticks(np.arange(-0.5, len(configs), 1), minor=True)
+    ax_heat.set_yticks(np.arange(-0.5, len(strategies), 1), minor=True)
+    ax_heat.grid(which="minor", color="white", linestyle="-", linewidth=1.1)
+    ax_heat.tick_params(which="minor", bottom=False, left=False)
+    for spine in ax_heat.spines.values():
+        spine.set_visible(False)
+    cbar = fig.colorbar(image, ax=ax_heat, fraction=0.045, pad=0.025)
+    cbar.ax.tick_params(labelsize=5.0, length=2)
+    cbar.ax.set_title("Gap (%)", fontsize=5.7, pad=2)
+
+    ax_bar = fig.add_subplot(grid[1])
+    x = np.arange(len(labels))
+    bars = ax_bar.bar(
+        x,
+        values,
+        width=0.56,
+        color=colors,
+        edgecolor="#333333",
+        linewidth=0.7,
+        zorder=3,
+    )
+    for bar, value in zip(bars, values):
+        ax_bar.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 0.45,
+            f"{value:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=5.7,
+        )
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(labels, fontsize=5.7)
+    ax_bar.set_ylabel("Mean gap (%)", fontsize=6.2, labelpad=1.5)
+    ax_bar.set_ylim(0, max(values) * 1.16 + 0.5)
+    ax_bar.tick_params(axis="y", labelsize=5.5, width=0.6, length=2.5)
+    ax_bar.grid(axis="y", linestyle="--", linewidth=0.45, alpha=0.65, zorder=0)
+    for spine in ("top", "right"):
+        ax_bar.spines[spine].set_visible(False)
+
+    fig.text(0.285, 0.012, "(a) 130 users.", ha="center", fontsize=6.1)
+    fig.text(0.815, 0.012, "(b) 10 servers/150 users.", ha="center", fontsize=6.1)
+    fig.subplots_adjust(left=0.16, right=0.985, top=0.98, bottom=0.27)
+
+    pdf_path = os.path.join(PROJECT_ROOT, "output", "pdf", "cls_initialization_sensitivity_combined.pdf")
+    png_path = os.path.join(PROJECT_ROOT, "output", "png", "cls_initialization_sensitivity_combined.png")
+    fig.savefig(pdf_path, format="pdf", bbox_inches="tight", facecolor="white")
+    fig.savefig(png_path, format="png", dpi=400, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return pdf_path
 
@@ -603,7 +722,8 @@ def main():
     config_plot_paths = plot_config_boxplots(results)
     summary_plot_path = plot_summary_bars(summary)
     fixed_130_path = plot_fixed_130_heatmap(summary)
-    random_greedy_path = plot_random_greedy_case(summary, config_name="10_150")
+    random_greedy_path = plot_random_greedy_case(summary, results, config_name="10_150")
+    combined_path = plot_combined_initialization_figure(summary, results)
 
     print("\n=== CLS Initialization Sensitivity Summary ===")
     cols = ["Config", "StrategyLabel", "Runs", "FinalMean", "FinalStd", "FinalCVPct", "MeanGapPct", "MeanIterations"]
@@ -621,6 +741,8 @@ def main():
         print("Saved:", fixed_130_path)
     if random_greedy_path:
         print("Saved:", random_greedy_path)
+    if combined_path:
+        print("Saved:", combined_path)
 
 
 if __name__ == "__main__":

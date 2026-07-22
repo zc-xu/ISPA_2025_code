@@ -7,15 +7,16 @@ import { SpreadsheetFile, Workbook } from "@oai/artifact-tool";
 const ROOT = path.resolve(process.cwd());
 const CSV_DIR = path.join(ROOT, "output", "csv");
 const OUTPUT_PATH = path.join(ROOT, "output", "excel", "reviewer6_generalization_evidence.xlsx");
-const PREVIEW_DIR = path.join(ROOT, "output", "workbook_preview", "reviewer6_generalization");
+const PREVIEW_DIR = path.join(ROOT, "output", "workbook_preview", "reviewer6_generalization_main");
 
 const SOURCES = [
   ["Design", "reviewer6_generalization_design.csv", "DesignTable"],
-  ["Stage I", "reviewer6_large_region_stage1.csv", "StageITable"],
-  ["Wide Aggregate", "reviewer6_large_region_stage2_aggregate.csv", "WideAggregateTable"],
-  ["Wide Detail", "reviewer6_large_region_stage2_detail.csv", "WideDetailTable"],
-  ["Main Aggregate", "reviewer6_main_candidate_stage2_aggregate.csv", "MainAggregateTable"],
-  ["Main Detail", "reviewer6_main_candidate_stage2_detail.csv", "MainDetailTable"],
+  ["Stage I", "reviewer6_main_candidate_stage1.csv", "StageITable"],
+  ["Stage II Aggregate", "reviewer6_main_candidate_stage2_aggregate.csv", "StageIIAggregateTable"],
+  ["Stage II Seeds", "reviewer6_main_candidate_stage2_detail.csv", "StageIISeedTable"],
+  ["DQN Weighted", "reviewer6_main_candidate_dqn_weighted.csv", "DQNWeightedTable"],
+  ["BestQ Seeds", "reviewer6_main_candidate_bestq_detail.csv", "BestQSeedTable"],
+  ["BestQ Aggregate", "reviewer6_main_candidate_bestq_aggregate.csv", "BestQAggregateTable"],
 ];
 
 const COLORS = {
@@ -23,6 +24,7 @@ const COLORS = {
   blue: "#4C78A8",
   green: "#59A14F",
   orange: "#F28E2B",
+  purple: "#9467BD",
   red: "#C1121F",
   ink: "#1F2937",
   muted: "#5B6573",
@@ -171,7 +173,7 @@ function buildOverview(workbook) {
   const sheet = workbook.worksheets.getItem("Overview");
   sheet.showGridLines = false;
   sheet.getRange("A1:N1").merge();
-  sheet.getRange("A1").values = [["Reviewer 2 Comment 6: Geographical Generalization Evidence"]];
+  sheet.getRange("A1").values = [["Reviewer Comment 6: Geographical Generalization Evidence"]];
   sheet.getRange("A1:N1").format = {
     fill: COLORS.navy,
     font: { bold: true, color: COLORS.white, size: 17 },
@@ -180,7 +182,7 @@ function buildOverview(workbook) {
   };
   sheet.getRange("A1:N1").format.rowHeight = 36;
   sheet.getRange("A2:N2").merge();
-  sheet.getRange("A2").values = [["Real Beijing base-station topology; reproducible sparse, clustered, and skewed traffic profiles; Stage I and Stage II evaluated end to end."]];
+  sheet.getRange("A2").values = [["A geographically distinct real-station instance evaluated end to end with Stage I, Stage II, and the DQN learning baseline."]];
   sheet.getRange("A2:N2").format = {
     fill: COLORS.paleBlue,
     font: { color: COLORS.muted, italic: true, size: 10 },
@@ -191,22 +193,24 @@ function buildOverview(workbook) {
   sheet.getRange("A4:B4").values = [["Evidence item", "Value"]];
   styleHeader(sheet.getRange("A4:B4"));
   sheet.getRange("A5:A10").values = [
-    ["Alternate-region center shift (km)"],
-    ["Expanded area scale, minimum (x)"],
-    ["Expanded area scale, maximum (x)"],
-    ["Expanded Stage I CLS gain, minimum (%)"],
-    ["Expanded Stage I CLS gain, maximum (%)"],
-    ["Seeds per Stage II scenario"],
+    ["New-region centroid shift (km)"],
+    ["Candidate stations in new instance"],
+    ["Candidate-station scale vs. original (x)"],
+    ["New-region coverage-density CV"],
+    ["Stage I CLS objective reduction (%)"],
+    ["Stage II random seeds"],
   ];
   sheet.getRange("B5:B10").formulas = [
     ["='Design'!H3"],
-    ["=MIN('Design'!N4:N6)"],
-    ["=MAX('Design'!N4:N6)"],
-    ["=MIN('Stage I'!S2:S4)"],
-    ["=MAX('Stage I'!S2:S4)"],
-    ["='Wide Aggregate'!C2"],
+    ["='Design'!C3"],
+    ["='Design'!C3/'Design'!C2"],
+    ["='Design'!R3"],
+    ["='Stage I'!R2"],
+    ["='Stage II Aggregate'!C2"],
   ];
-  sheet.getRange("B5:B9").format.numberFormat = "0.00";
+  sheet.getRange("B5").format.numberFormat = "0.00";
+  sheet.getRange("B6").format.numberFormat = "#,##0";
+  sheet.getRange("B7:B9").format.numberFormat = "0.0000";
   sheet.getRange("B10").format.numberFormat = "#,##0";
   sheet.getRange("A5:B10").format = {
     font: { color: COLORS.ink, size: 10 },
@@ -217,20 +221,20 @@ function buildOverview(workbook) {
   sheet.getRange("B5:B10").format.font = { bold: true, color: COLORS.navy };
 
   sheet.getRange("C4:F4").merge();
-  sheet.getRange("C4").values = [["Recommended use in the revision"]];
+  sheet.getRange("C4").values = [["Verified conclusion"]];
   styleHeader(sheet.getRange("C4:F4"));
   const notes = [
-    "Main paper: use the alternate real region, where PSP has the best mean HV, IGD, and Best Q across three seeds.",
-    "Response or supplement: use the expanded-region stress test to demonstrate end-to-end portability and expose distribution-dependent Stage II behavior.",
-    "Evidence boundary: base-station coordinates are real; sparse, clustered, and skewed user traffic profiles are reproducibly generated.",
-    "Claim boundary: the experiment supports geographical applicability, not universal superiority of PSP under every traffic distribution.",
+    "The new real-station topology is 24.20 km from the original Xizhimen centroid and doubles the candidate count from 20 to 40.",
+    "CLS reduces the best recorded non-CLS Stage I objective from 6,150.5741 to 2,304.7670, a reduction of 62.53%.",
+    "Across seeds 42, 43, and 44, PSP has the best mean HV, IGD, and Best Q among the four population methods.",
+    "Under the common equal-weight evaluation, PSP Best Q is 0.2678 and DQN Best Q is 0.5517.",
   ];
   notes.forEach((note, index) => {
     const row = 5 + index;
     sheet.getRange(`C${row}:F${row}`).merge();
     sheet.getRange(`C${row}`).values = [[note]];
     sheet.getRange(`C${row}:F${row}`).format = {
-      fill: index === 3 ? COLORS.paleRed : COLORS.paleGray,
+      fill: index === 3 ? "#F2EAFE" : COLORS.paleGray,
       font: { color: COLORS.ink, size: 9 },
       wrapText: true,
       verticalAlignment: "center",
@@ -239,53 +243,92 @@ function buildOverview(workbook) {
     sheet.getRange(`C${row}:F${row}`).format.rowHeight = 42;
   });
 
-  sheet.getRange("A13:B13").values = [["Traffic profile", "CLS gain (%)"]];
-  styleHeader(sheet.getRange("A13:B13"));
-  for (let index = 0; index < 3; index += 1) {
+  sheet.getRange("G4:I4").values = [["Instance", "Best non-CLS", "CLS"]];
+  styleHeader(sheet.getRange("G4:I4"));
+  sheet.getRange("G5:I5").formulas = [[
+    "=\"New region\"",
+    "='Stage I'!Q2",
+    "='Stage I'!J2",
+  ]];
+  sheet.getRange("H5:I5").format.numberFormat = "#,##0.0";
+
+  sheet.getRange("A13:H13").values = [["Method", "HV mean", "HV std", "IGD mean", "IGD std", "Best Q mean", "Best Q std", "Seeds"]];
+  styleHeader(sheet.getRange("A13:H13"));
+  for (let index = 0; index < 4; index += 1) {
     const targetRow = 14 + index;
     const sourceRow = 2 + index;
-    sheet.getRange(`A${targetRow}:B${targetRow}`).formulas = [[
-      `='Stage I'!B${sourceRow}`,
-      `='Stage I'!S${sourceRow}`,
+    sheet.getRange(`A${targetRow}:H${targetRow}`).formulas = [[
+      `='Stage II Aggregate'!B${sourceRow}`,
+      `='Stage II Aggregate'!D${sourceRow}`,
+      `='Stage II Aggregate'!E${sourceRow}`,
+      `='Stage II Aggregate'!F${sourceRow}`,
+      `='Stage II Aggregate'!G${sourceRow}`,
+      `='Stage II Aggregate'!H${sourceRow}`,
+      `='Stage II Aggregate'!I${sourceRow}`,
+      `='Stage II Aggregate'!C${sourceRow}`,
     ]];
   }
-  sheet.getRange("B14:B16").format.numberFormat = "0.0";
-
-  sheet.getRange("A20:E20").values = [["Method", "HV mean", "IGD mean", "Best Q mean", "Seeds"]];
-  styleHeader(sheet.getRange("A20:E20"));
-  for (let index = 0; index < 4; index += 1) {
-    const targetRow = 21 + index;
-    const sourceRow = 2 + index;
-    sheet.getRange(`A${targetRow}:E${targetRow}`).formulas = [[
-      `='Main Aggregate'!B${sourceRow}`,
-      `='Main Aggregate'!D${sourceRow}`,
-      `='Main Aggregate'!F${sourceRow}`,
-      `='Main Aggregate'!H${sourceRow}`,
-      `='Main Aggregate'!C${sourceRow}`,
-    ]];
-  }
-  sheet.getRange("B21:D24").format.numberFormat = "0.0000";
-  sheet.getRange("E21:E24").format.numberFormat = "#,##0";
-  sheet.getRange("A21:E24").format = {
+  sheet.getRange("B14:G17").format.numberFormat = "0.0000";
+  sheet.getRange("H14:H17").format.numberFormat = "#,##0";
+  sheet.getRange("A14:H17").format = {
     font: { color: COLORS.ink, size: 10 },
     borders: { insideHorizontal: { style: "thin", color: COLORS.line } },
   };
-  sheet.getRange("A24:E24").format = {
+  sheet.getRange("A17:H17").format = {
     fill: COLORS.paleRed,
     font: { bold: true, color: "#8E111B", size: 10 },
     borders: { top: { style: "thin", color: COLORS.red } },
   };
 
-  sheet.getRange("A27:F27").merge();
-  sheet.getRange("A27").values = [["Metric directions and interpretation"]];
-  styleHeader(sheet.getRange("A27:F27"));
-  sheet.getRange("A28:F31").values = [
+  sheet.getRange("A20:D20").values = [["Method", "Best Q mean", "Best Q std", "Seeds"]];
+  styleHeader(sheet.getRange("A20:D20"));
+  for (let index = 0; index < 5; index += 1) {
+    const targetRow = 21 + index;
+    const sourceRow = 2 + index;
+    sheet.getRange(`A${targetRow}:D${targetRow}`).formulas = [[
+      `='BestQ Aggregate'!A${sourceRow}`,
+      `='BestQ Aggregate'!C${sourceRow}`,
+      `='BestQ Aggregate'!D${sourceRow}`,
+      `='BestQ Aggregate'!B${sourceRow}`,
+    ]];
+  }
+  sheet.getRange("B21:C25").format.numberFormat = "0.0000";
+  sheet.getRange("D21:D25").format.numberFormat = "#,##0";
+  sheet.getRange("A21:D25").format = {
+    font: { color: COLORS.ink, size: 10 },
+    borders: { insideHorizontal: { style: "thin", color: COLORS.line } },
+  };
+  sheet.getRange("A24:D24").format = {
+    fill: COLORS.paleRed,
+    font: { bold: true, color: "#8E111B", size: 10 },
+  };
+  sheet.getRange("A25:D25").format = {
+    fill: "#F2EAFE",
+    font: { bold: true, color: COLORS.purple, size: 10 },
+  };
+
+  sheet.getRange("G20:L20").values = [["Metric", "NS-P", "GCP", "GDP", "PSP", "DQN"]];
+  styleHeader(sheet.getRange("G20:L20"));
+  sheet.getRange("G21:L21").formulas = [[
+    "=\"Best Q\"",
+    "='BestQ Aggregate'!C2",
+    "='BestQ Aggregate'!C3",
+    "='BestQ Aggregate'!C4",
+    "='BestQ Aggregate'!C5",
+    "='BestQ Aggregate'!C6",
+  ]];
+  sheet.getRange("H21:L21").format.numberFormat = "0.0000";
+
+  sheet.getRange("A28:F28").merge();
+  sheet.getRange("A28").values = [["Metric directions and interpretation"]];
+  styleHeader(sheet.getRange("A28:F28"));
+  sheet.getRange("A29:F32").values = [
     ["HV: higher is better; it measures the objective-space volume dominated by the obtained Pareto set.", null, null, null, null, null],
     ["IGD: lower is better; it measures the average distance from a common reference front to the obtained Pareto set.", null, null, null, null, null],
-    ["Best Q: lower is better; Q is the equal-weight normalized cost-delay scalar used only as a representative compromise indicator.", null, null, null, null, null],
-    ["All Stage II aggregates report mean and sample standard deviation over seeds 42, 43, and 44.", null, null, null, null, null],
+    ["Best Q: lower is better; every method uses the same per-seed bounds and Q = 0.5 x normalized cost + 0.5 x normalized delay.", null, null, null, null, null],
+    ["All aggregate values report mean and sample standard deviation over seeds 42, 43, and 44.", null, null, null, null, null],
   ];
-  for (let row = 28; row <= 31; row += 1) {
+  for (let row = 29; row <= 32; row += 1) {
     sheet.getRange(`A${row}:F${row}`).merge();
     sheet.getRange(`A${row}:F${row}`).format = {
       fill: row % 2 === 0 ? "#FFFFFF" : COLORS.paleGray,
@@ -300,23 +343,31 @@ function buildOverview(workbook) {
   sheet.getRange("A:A").format.columnWidth = 34;
   sheet.getRange("B:B").format.columnWidth = 16;
   sheet.getRange("C:F").format.columnWidth = 16;
-  sheet.getRange("G:N").format.columnWidth = 12;
+  sheet.getRange("G:G").format.columnWidth = 18;
+  sheet.getRange("H:N").format.columnWidth = 12;
 
-  const stageChart = sheet.charts.add("bar", sheet.getRange("A13:B16"));
-  stageChart.title = "Expanded region: Stage I CLS improvement (%)";
+  const stageChart = sheet.charts.add("bar", sheet.getRange("G4:I5"));
+  stageChart.title = "Stage I coverage/access objective";
   stageChart.titleTextStyle.fontSize = 12;
-  stageChart.hasLegend = false;
+  stageChart.hasLegend = true;
   stageChart.xAxis = { axisType: "textAxis", textStyle: { fontSize: 9 } };
-  stageChart.yAxis = { numberFormatCode: "0.0", min: 0 };
-  stageChart.setPosition("G4", "N17");
+  stageChart.yAxis = { numberFormatCode: "#,##0", min: 0 };
+  stageChart.setPosition("I7", "N18");
+  const stageSeries = stageChart.series.items;
+  if (stageSeries[0]) stageSeries[0].fill = COLORS.muted;
+  if (stageSeries[1]) stageSeries[1].fill = COLORS.red;
 
-  const hvChart = sheet.charts.add("bar", sheet.getRange("A20:B24"));
-  hvChart.title = "Alternate region: mean hypervolume (3 seeds)";
-  hvChart.titleTextStyle.fontSize = 12;
-  hvChart.hasLegend = false;
-  hvChart.xAxis = { axisType: "textAxis", textStyle: { fontSize: 9 } };
-  hvChart.yAxis = { numberFormatCode: "0.00", min: 0 };
-  hvChart.setPosition("G19", "N32");
+  const bestQChart = sheet.charts.add("bar", sheet.getRange("G20:L21"));
+  bestQChart.title = "Stage II mean Best Q (lower is better)";
+  bestQChart.titleTextStyle.fontSize = 12;
+  bestQChart.hasLegend = true;
+  bestQChart.xAxis = { axisType: "textAxis", textStyle: { fontSize: 9 } };
+  bestQChart.yAxis = { numberFormatCode: "0.00", min: 0 };
+  bestQChart.setPosition("G23", "N36");
+  const bestQColors = [COLORS.blue, COLORS.green, COLORS.orange, COLORS.red, COLORS.purple];
+  bestQChart.series.items.forEach((series, index) => {
+    if (bestQColors[index]) series.fill = bestQColors[index];
+  });
   return sheet;
 }
 
@@ -335,9 +386,9 @@ async function main() {
 
   const overviewCheck = await workbook.inspect({
     kind: "table",
-    range: "Overview!A1:N31",
+    range: "Overview!A1:N36",
     include: "values,formulas",
-    tableMaxRows: 31,
+    tableMaxRows: 36,
     tableMaxCols: 14,
     maxChars: 7000,
   });
@@ -354,13 +405,14 @@ async function main() {
   console.log(errorScan.ndjson);
 
   const renderRanges = new Map([
-    ["Overview", "A1:N32"],
-    ["Design", "A1:U6"],
-    ["Stage I", "A1:T4"],
-    ["Wide Aggregate", "A1:I13"],
-    ["Wide Detail", "A1:M37"],
-    ["Main Aggregate", "A1:I5"],
-    ["Main Detail", "A1:M13"],
+    ["Overview", "A1:N36"],
+    ["Design", "A1:U3"],
+    ["Stage I", "A1:S2"],
+    ["Stage II Aggregate", "A1:I5"],
+    ["Stage II Seeds", "A1:G13"],
+    ["DQN Weighted", "A1:M16"],
+    ["BestQ Seeds", "A1:C16"],
+    ["BestQ Aggregate", "A1:D6"],
   ]);
   for (const [sheetName, range] of renderRanges.entries()) {
     const preview = await workbook.render({ sheetName, range, scale: 1.2, format: "png" });

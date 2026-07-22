@@ -13,6 +13,8 @@ from pymoo.core.problem import Problem
 from pymoo.core.sampling import Sampling
 from pymoo.core.repair import Repair
 from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
 from pymoo.termination import get_termination
 from pymoo.optimize import minimize
 
@@ -37,6 +39,18 @@ import numpy as np
 # --- 全局字体设置 (确保与 main.py 风格一致) ---
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['axes.unicode_minus'] = False
+
+
+def build_nsga2_algorithm(pop_size, sampling, repair, n_var, eliminate_duplicates=True):
+    """Construct NSGA-II with the operator settings used in the paper."""
+    return NSGA2(
+        pop_size=pop_size,
+        sampling=sampling,
+        crossover=SBX(prob=0.9, eta=15, prob_var=0.5),
+        mutation=PM(prob=1.0, eta=20, prob_var=1.0 / max(int(n_var), 1)),
+        repair=repair,
+        eliminate_duplicates=eliminate_duplicates,
+    )
 
 
 def visualize_detailed_hybrid_process(server_id, candidate_data):
@@ -821,7 +835,7 @@ class ServiceSampling(Sampling):
 
                 # --- 3. 选择逻辑 ---
 
-                keep_top_n = 2 if self.deterministic_anchor_size is None else int(self.deterministic_anchor_size)
+                keep_top_n = int(np.ceil(0.5 * cap)) if self.deterministic_anchor_size is None else int(self.deterministic_anchor_size)
                 keep_top_n = max(0, min(cap, keep_top_n))
 
                 random_pick_n = cap - keep_top_n
@@ -1226,10 +1240,11 @@ def run_nsga_service_deploy(servers_pos,
     )
 
     # 2) 构造NSGA2 算法
-    algorithm = NSGA2(
+    algorithm = build_nsga2_algorithm(
         pop_size=pop_size,
         sampling=ServiceSampling(),   # 我们自定义的 0/1 sampling
         repair=ServiceRepair(),       # 我们自定义的修复(保证行中<=4个1)
+        n_var=problem.n_var,
         eliminate_duplicates=True
     )
 
@@ -1379,20 +1394,21 @@ if __name__ == "__main__":
 
     for mode, filename in strategies.items():
         print(f"\n🚀 正在运行初始化策略：{mode}")
-        algorithm = NSGA2(
-            pop_size=50,
-            # pop_size=60,
-            # pop_size=20,
-            sampling=ServiceSampling(mode),
-            repair=ServiceRepair(),
-            eliminate_duplicates=True
-        )
         problem = MyServiceDeployProblem(
             k=len(best_sol),
             servers_pos=selected_positions,
             user_positions=user_positions,
             user_services=user_services,
             assigned_server=assignment
+        )
+        algorithm = build_nsga2_algorithm(
+            pop_size=50,
+            # pop_size=60,
+            # pop_size=20,
+            sampling=ServiceSampling(mode),
+            repair=ServiceRepair(),
+            n_var=problem.n_var,
+            eliminate_duplicates=True
         )
         termination = get_termination("n_gen", 200)
         res = minimize(

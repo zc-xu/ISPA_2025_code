@@ -12,7 +12,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.indicators.hv import HV
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
@@ -31,7 +30,12 @@ import LocalSearch.nsga_service_deploy as nsga_service_deploy
 import LocalSearch.service_selection_strategies as service_selection_strategies
 from LocalSearch.experiment_configs import EXPERIMENT_CONFIGS, select_configs
 from LocalSearch.experiment_utils import build_stage_context
-from LocalSearch.nsga_service_deploy import MyServiceDeployProblem, ServiceRepair, ServiceSampling
+from LocalSearch.nsga_service_deploy import (
+    MyServiceDeployProblem,
+    ServiceRepair,
+    ServiceSampling,
+    build_nsga2_algorithm,
+)
 from LocalSearch.pareto_batch_metrics import igd, nondominated, normalize, spacing
 
 
@@ -90,7 +94,7 @@ def run_one(config_name, context, capacity, varpi, seed, pop_size, n_gen, verbos
         user_services=context["user_services"],
         assigned_server=context["assigned_server"],
     )
-    algorithm = NSGA2(
+    algorithm = build_nsga2_algorithm(
         pop_size=pop_size,
         sampling=ServiceSampling(
             "hybrid-A-1",
@@ -99,7 +103,7 @@ def run_one(config_name, context, capacity, varpi, seed, pop_size, n_gen, verbos
             capacity_per_server=capacity,
         ),
         repair=ServiceRepair(capacity_per_server=capacity),
-        eliminate_duplicates=True,
+        n_var=problem.n_var,
     )
 
     runner = lambda: minimize(
@@ -128,7 +132,7 @@ def run_one(config_name, context, capacity, varpi, seed, pop_size, n_gen, verbos
         f"res_hybrid_anchor_cap{capacity}_varpi{varpi}_{config_name}_seed{seed}.npz",
     )
     np.savez(npz_path, X=X, F=F, config=config_name, capacity=capacity, varpi=varpi, seed=seed)
-    return F, npz_path
+    return F, os.path.relpath(npz_path, PROJECT_ROOT).replace(os.sep, "/")
 
 
 def calculate_detail_metrics(results, alpha=0.5, ref_point=(1.1, 1.1)):

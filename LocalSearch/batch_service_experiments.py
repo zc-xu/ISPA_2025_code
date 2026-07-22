@@ -16,13 +16,17 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 
 from LocalSearch.experiment_configs import EXPERIMENT_CONFIGS, select_configs
 from LocalSearch.experiment_utils import build_stage_context, load_input_from_excel
-from LocalSearch.nsga_service_deploy import MyServiceDeployProblem, ServiceRepair, ServiceSampling
+from LocalSearch.nsga_service_deploy import (
+    MyServiceDeployProblem,
+    ServiceRepair,
+    ServiceSampling,
+    build_nsga2_algorithm,
+)
 from LocalSearch.pareto_batch_metrics import run as run_pareto_metrics
 
 
@@ -71,18 +75,18 @@ def run_nsga_methods(config_name, context, pop_size=50, n_gen=200, seed=42, visu
         np.random.seed(method_seed)
 
         print(f"[{config_name}] Running NSGA-II initialization mode: {mode}")
-        algorithm = NSGA2(
-            pop_size=pop_size,
-            sampling=ServiceSampling(mode, visualize_hybrid_process=visualize_hybrid_process),
-            repair=ServiceRepair(),
-            eliminate_duplicates=True,
-        )
         problem = MyServiceDeployProblem(
             k=context["k"],
             servers_pos=context["servers_pos"],
             user_positions=context["user_positions"],
             user_services=context["user_services"],
             assigned_server=context["assigned_server"],
+        )
+        algorithm = build_nsga2_algorithm(
+            pop_size=pop_size,
+            sampling=ServiceSampling(mode, visualize_hybrid_process=visualize_hybrid_process),
+            repair=ServiceRepair(),
+            n_var=problem.n_var,
         )
         res = minimize(
             problem,

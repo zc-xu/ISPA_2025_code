@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import os
+import shutil
 import sys
 
 import pandas as pd
@@ -23,11 +24,22 @@ from LocalSearch.real_region_generalization import rank_stage2
 OUT_CSV_DIR = os.path.join(PROJECT_ROOT, "output", "csv")
 OUT_XLSX_DIR = os.path.join(PROJECT_ROOT, "output", "excel")
 OUT_LOG_DIR = os.path.join(PROJECT_ROOT, "output", "logs")
+OUT_NPZ_SEED_DIR = os.path.join(PROJECT_ROOT, "output", "npz", "seed_checks")
 
 
 def ensure_dirs():
-    for path in (OUT_CSV_DIR, OUT_XLSX_DIR, OUT_LOG_DIR):
+    for path in (OUT_CSV_DIR, OUT_XLSX_DIR, OUT_LOG_DIR, OUT_NPZ_SEED_DIR):
         os.makedirs(path, exist_ok=True)
+
+
+def archive_npz_results(paths, seed):
+    archived = []
+    for path in paths:
+        stem, ext = os.path.splitext(os.path.basename(path))
+        target = os.path.join(OUT_NPZ_SEED_DIR, f"{stem}_seed{seed}{ext}")
+        shutil.copy2(path, target)
+        archived.append(target)
+    return archived
 
 
 def load_screen(path):
@@ -74,7 +86,7 @@ def run(args):
         log_path = os.path.join(OUT_LOG_DIR, f"{config_name}_{args.output_prefix}.log")
         with open(log_path, "w", encoding="utf-8") as log:
             with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
-                run_nsga_methods(
+                result_paths = run_nsga_methods(
                     config_name=config_name,
                     context=context,
                     pop_size=args.pop_size,
@@ -82,6 +94,9 @@ def run(args):
                     seed=args.seed,
                     visualize_hybrid_process=False,
                 )
+                if args.archive_npz:
+                    for path in archive_npz_results(result_paths, args.seed):
+                        print("Archived:", path)
                 metrics = run_pareto_metrics(config_name=config_name, alpha=args.metric_alpha)
         metrics = metrics.copy()
         metrics.insert(0, "Seed", int(args.seed))
@@ -127,6 +142,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--metric-alpha", type=float, default=0.5)
     parser.add_argument("--output-prefix", default="real_region_stage2_from_screen")
+    parser.add_argument("--archive-npz", action="store_true")
     args = parser.parse_args()
     run(args)
 
