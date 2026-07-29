@@ -1,0 +1,36 @@
+Config,Method,BestQ,Source,NormalizationClass,NormalizationEvidence,ProtocolSeed,CostLower,CostUpper,DelayLower,DelayUpper
+10_100,NS-P,0.2975000000,Original paper Excel Sheet1 B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_100,PSP,0.2686000000,Original paper Excel Sheet1 B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_100,GCP,0.2996000000,Original paper Excel Sheet1 B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_100,GDP,0.2748000000,Original paper Excel Sheet1 B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_100,DQN,0.5770307911,output/npz/res_dqn_10_100.npz,exact-paper-bounds,output/npz/paper_protocol_audit/seed42/reset_per_method/10_100_configured_nsp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_100_configured_gcp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_100_configured_gdp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_100_configured_psp.npz,42,1006.8521578812,2786.9108766440,107.2530547209,359.7631461480
+10_130,NS-P,0.3894000000,Original paper Excel Sheet1 V10:Y10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_130,PSP,0.3282000000,Original paper Excel Sheet1 V10:Y10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_130,GCP,0.3550000000,Original paper Excel Sheet1 V10:Y10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_130,GDP,0.3363000000,Original paper Excel Sheet1 V10:Y10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_130,DQN,0.6125035722,output/npz/res_dqn_10_130.npz,exact-paper-bounds,output/excel/nsga2_normalized_results20.xlsx,42,1117.7023215525,2728.2186560475,149.4944480274,386.0962458145
+10_150,NS-P,0.3023000000,Original paper Excel Sheet1 B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_150,PSP,0.2749000000,Original paper Excel Sheet1 B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_150,GCP,0.2868000000,Original paper Excel Sheet1 B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_150,GDP,0.2847000000,Original paper Excel Sheet1 B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_150,DQN,0.4971969240,output/npz/res_dqn_10_150.npz,same-config-seed42-bounds,output/npz/paper_protocol_audit/seed42/reset_per_method/10_150_new_nsp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_150_new_gcp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_150_new_gdp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_150_new_psp.npz,42,1118.9683333795,2892.3423662416,189.2486475303,615.6353586865
+10_180,NS-P,0.2976000000,Original paper Excel Sheet1 V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_180,PSP,0.2774000000,Original paper Excel Sheet1 V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_180,GCP,0.2955000000,Original paper Excel Sheet1 V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_180,GDP,0.2896000000,Original paper Excel Sheet1 V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+10_180,DQN,0.4840131472,output/npz/res_dqn_10_180.npz,same-config-seed42-bounds,output/npz/paper_protocol_audit/seed42/reset_per_method/10_180_new_nsp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_180_new_gcp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_180_new_gdp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/10_180_new_psp.npz,42,1196.8044711888,2699.2762393858,225.6449586892,697.3691700036
+5_130,NS-P,0.2150000000,Original paper Excel Sheet1 (2) B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+5_130,PSP,0.1945000000,Original paper Excel Sheet1 (2) B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+5_130,GCP,0.2304000000,Original paper Excel Sheet1 (2) B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+5_130,GDP,0.2393000000,Original paper Excel Sheet1 (2) B10:E10,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+5_130,DQN,0.4051715848,output/npz/res_dqn_5_130.npz,exact-paper-bounds,output/excel/nsga2_normalized_results.xlsx,42,1061.0197564168,1958.2813477085,328.8677359956,772.1755500689
+15_130,NS-P,0.3072000000,Original paper Excel Sheet1 (2) B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+15_130,PSP,0.2646000000,Original paper Excel Sheet1 (2) B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+15_130,GCP,0.2729000000,Original paper Excel Sheet1 (2) B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+15_130,GDP,0.2980000000,Original paper Excel Sheet1 (2) B27:E27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+15_130,DQN,0.6077332731,output/npz/res_dqn_15_130.npz,same-config-seed42-bounds,output/npz/paper_protocol_audit/seed42/reset_per_method/15_130_configured_nsp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/15_130_configured_gcp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/15_130_configured_gdp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/15_130_configured_psp.npz,42,1165.7295983642,3491.8340065148,112.9868738193,382.9283522424
+20_130,NS-P,0.3196000000,Original paper Excel Sheet1 (2) V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+20_130,PSP,0.2864000000,Original paper Excel Sheet1 (2) V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+20_130,GCP,0.2980000000,Original paper Excel Sheet1 (2) V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+20_130,GDP,0.3049000000,Original paper Excel Sheet1 (2) V27:Y27,original-paper-archive,data/paper_archive/stage2_bestq_original_paper.csv,42,,,,
+20_130,DQN,0.7077210813,output/npz/res_dqn_20_130.npz,same-config-seed42-bounds,output/npz/paper_protocol_audit/seed42/reset_per_method/20_130_configured_nsp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/20_130_configured_gcp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/20_130_configured_gdp.npz; output/npz/paper_protocol_audit/seed42/reset_per_method/20_130_configured_psp.npz,42,1268.4709243256,3674.4286330439,94.2936575125,368.1775265604

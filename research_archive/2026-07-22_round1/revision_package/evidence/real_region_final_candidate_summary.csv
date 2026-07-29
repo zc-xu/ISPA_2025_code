@@ -1,0 +1,17 @@
+Section,Item,Value
+Stage I,configuration,real_sparse_r04_c40_u130_k10_s1
+Stage I,candidates/users/deployed_servers,40/130/10
+Stage I,CLS cost,2304.7670
+Stage I,best baseline cost,6150.5741
+Stage I,CLS advantage (%),62.5276
+Geography,station radius km,4.4815
+Geography,bbox width x height km,6.7009 x 8.7001
+Geography,user nearest-neighbor mean km,0.3348
+Geography,coverage density CV,0.3359
+Stage II seed42,NS-P HV/IGD/BestQ,1.0481/0.0193/0.2344
+Stage II seed42,GCP HV/IGD/BestQ,1.0478/0.0263/0.2421
+Stage II seed42,GDP HV/IGD/BestQ,1.0252/0.0405/0.2385
+Stage II seed42,PSP HV/IGD/BestQ,1.0490/0.0192/0.2273
+Seed check,seed 42 PSP wins HV/IGD/BestQ,True/True/True
+Seed check,seed 43 PSP wins HV/IGD/BestQ,True/True/False
+Seed check,seed 44 PSP wins HV/IGD/BestQ,True/True/True
