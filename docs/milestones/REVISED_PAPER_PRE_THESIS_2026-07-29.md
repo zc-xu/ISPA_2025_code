@@ -12,10 +12,11 @@ thesis-specific algorithm or experiment development.
 - Archive branch: `archive/revised-paper-pre-thesis-2026-07-29`
 - Frozen research package: `research_archive/2026-07-22_round1/`
 
-The tag and archive branch point directly to the canonical snapshot commit.
-They exclude later local-only Mac compatibility changes and therefore provide
-an exact reference for reproducing, comparing, or recovering the revised-paper
-code and evidence.
+The pre-thesis tag points directly to the canonical snapshot commit. The
+archive branch preserves the same code, experiment data, figures, and
+manuscript artifacts together with the milestone and verified integrity
+metadata added during archival. Both references exclude later local-only Mac
+compatibility changes.
 
 ## Branch Roles After This Milestone
 
@@ -28,16 +29,16 @@ code and evidence.
 
 ## Recovery and Comparison
 
-Inspect the preserved state without changing a branch:
+Inspect the exact source snapshot without changing a branch:
 
 ```bash
 git switch --detach revised-paper-pre-thesis-2026-07-29
 ```
 
-Create a recovery branch from the preserved state:
+Create a recovery branch from the verification-ready archive:
 
 ```bash
-git switch -c recovery/revised-paper revised-paper-pre-thesis-2026-07-29
+git switch -c recovery/revised-paper archive/revised-paper-pre-thesis-2026-07-29
 ```
 
 Compare later thesis development against this baseline:
